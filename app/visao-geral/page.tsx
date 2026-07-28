@@ -301,7 +301,10 @@ export default function VisaoGeralPage() {
                         {formatPercentPlain(
                           tesouro.referencia_ipca2050.threshold_monitorado_pct,
                           2
-                        )}
+                        )}{" "}
+                        <span className="text-xs">
+                          (premissa configurável do usuário — não é meta oficial)
+                        </span>
                       </span>
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -363,6 +366,13 @@ export default function VisaoGeralPage() {
                         </span>{" "}
                         <span className="font-medium">
                           {humanizeKey(regime.estado)}
+                        </span>
+                        {regime.eh_expectativa && (
+                          <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-400">
+                            expectativa de mercado — não é fato
+                          </span>
+                        )}
+                        <span className="hidden">
                         </span>
                       </span>
                       <ConfidenceBadge value={regime.confianca} />

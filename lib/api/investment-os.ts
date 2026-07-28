@@ -364,6 +364,7 @@ export interface OverviewTesouroReferencia {
   taxa_pct: number;
   percentil_historico: number | null;
   threshold_monitorado_pct: number;
+  threshold_origem?: string;
 }
 
 export interface OverviewTesouro {
@@ -379,6 +380,7 @@ export interface OverviewMacro {
     dimensao: string;
     estado: string;
     confianca: ConfiancaMacro;
+    eh_expectativa?: boolean;
   }>;
 }
 
