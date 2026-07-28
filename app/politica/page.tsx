@@ -62,7 +62,7 @@ import {
 } from "@/components/ui/table";
 
 interface AssessmentView {
-  assessment_id: string;
+  assessment_id: number;
   scores: Record<string, number>;
   conflicts: string[];
   confidence: string;
@@ -206,7 +206,7 @@ export default function PoliticaPage() {
   const [editorVersionLabel, setEditorVersionLabel] = useState<string | null>(
     null
   );
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
   const refreshPolicy = useCallback(async () => {
@@ -264,7 +264,7 @@ export default function PoliticaPage() {
   }, [editorText, generateDraft]);
 
   const handleConfirm = useCallback(
-    async (versionId: string) => {
+    async (versionId: number) => {
       setConfirmBusy(true);
       setPolicyActionError(null);
       try {

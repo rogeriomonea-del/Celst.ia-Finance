@@ -64,14 +64,14 @@ export function errorMessage(error: unknown): string {
 export type Confianca = "BAIXA" | "MEDIA" | "ALTA";
 
 export interface ProfileQuestion {
-  id: string;
+  id: number;
   dimension: string;
   text: string;
   options: string[];
 }
 
 export interface ProfileAssessment {
-  assessment_id: string;
+  assessment_id: number;
   scores: Record<string, number>;
   conflicts: string[];
   pending_questions: ProfileQuestion[];
@@ -79,7 +79,7 @@ export interface ProfileAssessment {
 }
 
 export interface LatestAssessment {
-  assessment_id: string;
+  assessment_id: number;
   scores: Record<string, number>;
   conflicts: string[];
   confidence: Confianca;
@@ -92,15 +92,15 @@ export type PolicyStatus = "draft" | "confirmed" | "superseded";
 export type PolicyContent = Record<string, unknown>;
 
 export interface PolicyDraftResult {
-  policy_id: string;
-  version_id: string;
+  policy_id: number;
+  version_id: number;
   version: number;
   status: "draft";
   content: PolicyContent;
 }
 
 export interface PolicyVersion {
-  version_id: string;
+  version_id: number;
   version: number;
   status: PolicyStatus;
   created_at: string;
@@ -112,13 +112,13 @@ export interface PolicyVersion {
 }
 
 export interface PolicyConfirmResult {
-  version_id: string;
+  version_id: number;
   version: number;
   status: "confirmed";
 }
 
 export interface ConfirmedPolicy {
-  version_id: string;
+  version_id: number;
   version: number;
   content: PolicyContent;
   confirmed_at: string;
@@ -141,23 +141,50 @@ export type AssetClassApi =
   | "renda_fixa"
   | "outro";
 
+/** Resolução de instrumento retornada pelo backend (objeto, pode ser `{}`). */
+export interface InstrumentResolution {
+  status?: "ok" | "ambiguous" | "unknown";
+  confidence?: Confianca;
+  method?: string;
+  reason?: string;
+  ticker?: string;
+  cnpj?: string | null;
+  classe?: string | null;
+  cd_cvm?: string | null;
+  setor?: string | null;
+  asset_class?: string | null;
+  asset_class_hint?: string | null;
+}
+
 export interface ImportRow {
-  row_id: string;
+  row_id: number;
   row_index: number;
   status: ImportRowStatus;
   reason: string | null;
-  confidence: number | null;
+  confidence: Confianca | null;
   ticker: string | null;
   quantity: number | null;
   avg_cost: number | null;
   cost_status: CostStatus;
   currency: string | null;
   data_base: string | null;
-  resolution: string | null;
+  resolution: InstrumentResolution | null;
+}
+
+/** Resumo legível da resolução (método + motivo), nunca o objeto cru. */
+export function resolutionToLabel(res: InstrumentResolution | null): string | null {
+  if (!res || Object.keys(res).length === 0) return null;
+  const parts: string[] = [];
+  if (res.method === "fca_listing") parts.push("listagem oficial FCA/CVM");
+  else if (res.method === "user_override") parts.push("confirmado manualmente");
+  else if (res.method === "unresolved") parts.push("não resolvido");
+  if (res.asset_class) parts.push(`classe ${res.asset_class}`);
+  if (res.reason) parts.push(res.reason);
+  return parts.length ? parts.join(" · ") : null;
 }
 
 export interface ImportPreview {
-  import_id: string;
+  import_id: number;
   status: string;
   adapter: string;
   file_sha256: string;
@@ -169,14 +196,14 @@ export interface ImportPreview {
 }
 
 export interface ImportConfirmResult {
-  snapshot_id: string;
+  snapshot_id: number;
   version: number;
   idempotent: boolean;
   excluded_rows?: number | Array<string | number>;
 }
 
 export interface SnapshotSummary {
-  id: string;
+  id: number;
   version: number;
   created_at: string;
   data_base: string | null;
@@ -210,7 +237,7 @@ export interface PolicyViolation {
   chave: string;
   peso_pct: number;
   severidade: Severidade;
-  faixa?: string | null;
+  faixa?: { min_pct: number; max_pct: number } | null;
   limite_pct?: number | null;
 }
 
@@ -242,7 +269,7 @@ export interface SnapshotAnalysis {
   violacoes: PolicyViolation[];
   qualidade_dados: QualidadeDados;
   confianca: string;
-  fontes: string[] | Record<string, string>;
+  fontes: string | string[] | Record<string, string>;
   data_base_carteira: string | null;
   data_analise: string;
 }
@@ -263,7 +290,7 @@ export interface RebalanceAction {
 }
 
 export interface RebalancePlan {
-  plan_id: string;
+  plan_id: number;
   aporte_mensal_brl: number;
   premissas: string[];
   proximo_aporte: Record<string, number>;
@@ -286,7 +313,7 @@ export interface RebalancePlan {
 }
 
 export interface PortfolioIssue {
-  id: string;
+  id: number;
   created_at: string;
   scope: string;
   severity: string;
@@ -382,7 +409,7 @@ export function fetchPolicyVersions(): Promise<PolicyVersion[]> {
   return request<PolicyVersion[]>("/policy/versions");
 }
 
-export function confirmPolicy(versionId: string): Promise<PolicyConfirmResult> {
+export function confirmPolicy(versionId: number): Promise<PolicyConfirmResult> {
   return request<PolicyConfirmResult>(
     `/policy/${encodeURIComponent(versionId)}/confirm`,
     { method: "POST" }
@@ -415,15 +442,15 @@ export function importPortfolio(file: File): Promise<ImportPreview> {
   });
 }
 
-export function fetchImportPreview(importId: string): Promise<ImportPreview> {
+export function fetchImportPreview(importId: number): Promise<ImportPreview> {
   return request<ImportPreview>(
     `/portfolio/import/${encodeURIComponent(importId)}/preview`
   );
 }
 
 export function correctImportRow(
-  importId: string,
-  rowId: string,
+  importId: number,
+  rowId: number,
   correction: { ticker: string; asset_class?: AssetClassApi }
 ): Promise<ImportPreview> {
   return postJson<ImportPreview>(
@@ -435,7 +462,7 @@ export function correctImportRow(
 }
 
 export function confirmImport(
-  importId: string,
+  importId: number,
   acceptPartial: boolean
 ): Promise<ImportConfirmResult> {
   return postJson<ImportConfirmResult>(
@@ -460,20 +487,19 @@ export function fetchSnapshots(): Promise<SnapshotSummary[]> {
   return request<SnapshotSummary[]>("/portfolio/snapshots");
 }
 
-export function fetchSnapshot(id: string): Promise<SnapshotDetail> {
+export function fetchSnapshot(id: number): Promise<SnapshotDetail> {
   return request<SnapshotDetail>(
     `/portfolio/snapshots/${encodeURIComponent(id)}`
   );
 }
 
-export function fetchSnapshotAnalysis(id: string): Promise<SnapshotAnalysis> {
+export function fetchSnapshotAnalysis(id: number): Promise<SnapshotAnalysis> {
   return request<SnapshotAnalysis>(
     `/portfolio/snapshots/${encodeURIComponent(id)}/analysis`
   );
 }
 
-export function rebalanceSnapshot(
-  id: string,
+export function rebalanceSnapshot(id: number,
   months?: number
 ): Promise<RebalancePlan> {
   return postJson<RebalancePlan>(
@@ -490,11 +516,18 @@ export function fetchPortfolioIssues(): Promise<PortfolioIssue[]> {
 // Utilitários de exibição (não calculam indicadores; só normalizam formatos)
 // ---------------------------------------------------------------------------
 
-/** Normaliza `fontes` (lista ou mapa) para uma lista exibível. */
+/** Normaliza `fontes` (string, lista ou mapa) para uma lista exibível. */
 export function fontesToList(
   fontes: SnapshotAnalysis["fontes"] | undefined | null
 ): string[] {
   if (!fontes) return [];
+  if (typeof fontes === "string") return fontes.split(";").map((s) => s.trim()).filter(Boolean);
   if (Array.isArray(fontes)) return fontes.map(String);
   return Object.entries(fontes).map(([key, value]) => `${key}: ${String(value)}`);
+}
+
+/** Formata a faixa `{min_pct, max_pct}` de uma violação como texto. */
+export function faixaToLabel(faixa: PolicyViolation["faixa"]): string | null {
+  if (!faixa || typeof faixa !== "object") return null;
+  return `${faixa.min_pct ?? "?"}–${faixa.max_pct ?? "?"}%`;
 }

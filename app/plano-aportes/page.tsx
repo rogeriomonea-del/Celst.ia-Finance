@@ -158,7 +158,7 @@ export default function PlanoAportesPage() {
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
   const [confirmedPolicy, setConfirmedPolicy] =
     useState<ConfirmedPolicy | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [monthsInput, setMonthsInput] = useState("");
 
   const [plan, setPlan] = useState<RebalancePlan | null>(null);
@@ -307,7 +307,7 @@ export default function PlanoAportesPage() {
             <NativeSelect
               id="plan-snapshot"
               value={selectedId ?? ""}
-              onChange={(event) => setSelectedId(event.target.value)}
+              onChange={(event) => setSelectedId(Number(event.target.value))}
             >
               {snapshots.map((snapshot) => (
                 <option key={snapshot.id} value={snapshot.id}>
@@ -817,7 +817,7 @@ export default function PlanoAportesPage() {
                     },
                   ]
                 : []),
-              { label: "Plano", value: plan.plan_id },
+              { label: "Plano", value: String(plan.plan_id) },
             ]}
           />
         </>

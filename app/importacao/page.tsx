@@ -25,6 +25,7 @@ import {
   type ImportConfirmResult,
   type ImportPreview,
   type ImportRow,
+  resolutionToLabel,
 } from "@/lib/api/investment-os";
 import {
   ApiErrorState,
@@ -109,7 +110,7 @@ export default function ImportacaoPage() {
   const [corrections, setCorrections] = useState<Record<string, CorrectionDraft>>(
     {}
   );
-  const [correctingRowId, setCorrectingRowId] = useState<string | null>(null);
+  const [correctingRowId, setCorrectingRowId] = useState<number | null>(null);
   const [correctionError, setCorrectionError] = useState<string | null>(null);
 
   const [acceptPartial, setAcceptPartial] = useState(false);
@@ -400,18 +401,14 @@ export default function ImportacaoPage() {
                           <span className="line-clamp-2" title={row.reason ?? ""}>
                             {row.reason ?? "—"}
                           </span>
-                          {row.resolution && (
+                          {resolutionToLabel(row.resolution) && (
                             <span className="mt-0.5 block text-[11px] text-primary/90">
-                              Resolução: {row.resolution}
+                              Resolução: {resolutionToLabel(row.resolution)}
                             </span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {row.confidence !== null ? (
-                            formatNumber(row.confidence)
-                          ) : (
-                            <UnavailableValue label="—" />
-                          )}
+                        <TableCell className="text-right text-muted-foreground">
+                          {row.confidence ?? <UnavailableValue label="—" />}
                         </TableCell>
                         <TableCell>
                           {needsCorrection ? (

@@ -27,6 +27,7 @@ import {
   type PortfolioIssue,
   type SnapshotAnalysis,
   type SnapshotSummary,
+  faixaToLabel,
 } from "@/lib/api/investment-os";
 import {
   ApiErrorState,
@@ -98,7 +99,7 @@ function ViolationCard({ violation }: { violation: PolicyViolation }) {
         {violation.limite_pct !== null && violation.limite_pct !== undefined
           ? ` · limite: ${formatPercentPlain(violation.limite_pct)}`
           : ""}
-        {violation.faixa ? ` · faixa: ${violation.faixa}` : ""}
+        {faixaToLabel(violation.faixa) ? ` · faixa: ${faixaToLabel(violation.faixa)}` : ""}
       </p>
     </div>
   );
@@ -123,7 +124,7 @@ export default function CarteiraPage() {
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState<unknown>(null);
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [analysis, setAnalysis] = useState<SnapshotAnalysis | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<unknown>(null);
@@ -245,7 +246,7 @@ export default function CarteiraPage() {
           <NativeSelect
             id="snapshot-select"
             value={selectedId ?? ""}
-            onChange={(event) => setSelectedId(event.target.value)}
+            onChange={(event) => setSelectedId(Number(event.target.value))}
           >
             {snapshots.map((snapshot) => (
               <option key={snapshot.id} value={snapshot.id}>
@@ -406,8 +407,8 @@ export default function CarteiraPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {analysis.posicoes.map((position) => (
-                      <TableRow key={position.ticker}>
+                    {analysis.posicoes.map((position, positionIndex) => (
+                      <TableRow key={`${position.ticker}-${positionIndex}`}>
                         <TableCell className="font-medium">
                           {position.ticker}
                           {position.natureza && (
