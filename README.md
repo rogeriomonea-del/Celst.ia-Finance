@@ -1,12 +1,17 @@
 # celest.ia Financeiro — Plataforma de Análise Financeira e Inteligência Multi-Agente
 
-> **⚠️ STATUS: PROTÓTIPO COM DADOS SIMULADOS.** Este app exibe dados
-> estáticos/heurísticos (base fundamentalista embutida, curva patrimonial
-> sintética, Open Finance simulado) e cotações de agregador. Ele está sendo
-> integrado ao backend de dados oficiais do Investment Intelligence OS
-> (repositório `Celest.ia-v2-Alpha`) — ver `docs/REPOSITORY_AUDIT.md` e
-> `docs/INTEGRATION.md`. Nenhum número exibido deve ser tratado como real
-> até essa integração.
+> **⚠️ STATUS: INTEGRAÇÃO PARCIAL COM A API REAL.** As áreas **`/politica`
+> (Perfil e Política/IPS), `/importacao` (Importação B3), `/carteira` e
+> `/plano-aportes`** são conectadas à **API real** do backend do Investment
+> Intelligence OS (repositório `Celest.ia-v2-Alpha`, Fase 5) — elas não usam
+> nenhum dado simulado e exibem estado de erro explícito quando o backend
+> está fora do ar (`uvicorn investment_os.api.main:app`). As **demais áreas
+> antigas** (Dashboard, Agentes IA, Perfil, Rebalanceamento, Organizador)
+> **continuam sendo protótipo com dados simulados** (base fundamentalista
+> embutida, curva patrimonial sintética, Open Finance simulado, cotações de
+> agregador) e estão marcadas com o selo "Simulado" — nenhum número dessas
+> áreas deve ser tratado como real. Ver `docs/REPOSITORY_AUDIT.md` e
+> `docs/INTEGRATION.md`.
 
 
 Plataforma web de análise de investimentos construída com **Next.js 14 (App
@@ -14,7 +19,20 @@ Router) + TypeScript + Tailwind CSS**, com sistema multi-agente de IA para
 triagem fundamentalista de ações da B3, consolidação de carteira, perfil de
 investidor, rebalanceamento e organizador financeiro com Open Finance simulado.
 
-## Módulos
+## Módulos conectados à API real (Fase 5)
+
+| Rota | Módulo | Descrição |
+|---|---|---|
+| `/politica` | **Perfil e Política (IPS)** | Questionário adaptativo (scores por dimensão, conflitos, confiança), geração/edição de rascunhos da IPS em JSON, histórico de versões e confirmação explícita |
+| `/importacao` | **Importação B3** | Upload xlsx/csv (máx. 10 MB), prévia com contagens e remoção de PII, correção de linhas ambíguas/desconhecidas, confirmação com aceite de importação parcial |
+| `/carteira` | **Carteira** | Snapshot versionado: patrimônio precificado com nota de cobertura, pesos por classe/setor/moeda/país/emissor, posições com data do pregão, violações da IPS e qualidade dos dados |
+| `/plano-aportes` | **Plano de aportes** | Rebalanceamento por aportes segundo a IPS confirmada: destino do próximo aporte, planos de 3/6 meses, ações priorizadas com justificativa, premissas e vendas evitadas |
+
+Esses módulos exigem o backend rodando (`uvicorn investment_os.api.main:app`
+no repo `Celest.ia-v2-Alpha`) e usam `NEXT_PUBLIC_IIOS_API_URL`
+(padrão `http://localhost:8000`).
+
+## Módulos do protótipo (dados simulados — selo "Simulado")
 
 | Rota | Módulo | Descrição |
 |---|---|---|

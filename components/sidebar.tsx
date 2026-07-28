@@ -5,9 +5,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bot,
+  Briefcase,
+  CalendarClock,
+  FileUp,
   LayoutDashboard,
   Menu,
   Scale,
+  ScrollText,
   Sparkles,
   UserRound,
   Wallet,
@@ -21,40 +25,95 @@ interface NavItem {
   label: string;
   description: string;
   icon: typeof LayoutDashboard;
+  /** "api" = dados reais do backend; "simulado" = protótipo com dados estáticos. */
+  tag?: "api" | "simulado";
 }
 
 const NAV_ITEMS: NavItem[] = [
+  {
+    href: "/politica",
+    label: "Perfil e Política",
+    description: "Questionário adaptativo · IPS",
+    icon: ScrollText,
+    tag: "api",
+  },
+  {
+    href: "/importacao",
+    label: "Importação B3",
+    description: "Extrato → snapshot versionado",
+    icon: FileUp,
+    tag: "api",
+  },
+  {
+    href: "/carteira",
+    label: "Carteira",
+    description: "Pesos, violações e qualidade",
+    icon: Briefcase,
+    tag: "api",
+  },
+  {
+    href: "/plano-aportes",
+    label: "Plano de aportes",
+    description: "Rebalanceamento pela IPS",
+    icon: CalendarClock,
+    tag: "api",
+  },
   {
     href: "/",
     label: "Dashboard",
     description: "Carteira e indicadores",
     icon: LayoutDashboard,
+    tag: "simulado",
   },
   {
     href: "/agentes",
     label: "Agentes IA",
     description: "Análise multi-agente",
     icon: Bot,
+    tag: "simulado",
   },
   {
     href: "/perfil",
     label: "Perfil",
     description: "Suitability do investidor",
     icon: UserRound,
+    tag: "simulado",
   },
   {
     href: "/rebalanceamento",
     label: "Rebalanceamento",
     description: "Ajustes de alocação",
     icon: Scale,
+    tag: "simulado",
   },
   {
     href: "/organizador",
     label: "Organizador",
     description: "Fluxo de caixa · Open Finance",
     icon: Wallet,
+    tag: "simulado",
   },
 ];
+
+function NavTag({ tag }: { tag: NonNullable<NavItem["tag"]> }) {
+  return (
+    <span
+      className={cn(
+        "ml-auto shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+        tag === "api"
+          ? "bg-primary/15 text-primary ring-1 ring-primary/30"
+          : "bg-amber-500/10 text-amber-400/90 ring-1 ring-amber-500/20"
+      )}
+      title={
+        tag === "api"
+          ? "Dados reais da API do backend Investment Intelligence OS"
+          : "Protótipo com dados simulados — não tratar como dados reais"
+      }
+    >
+      {tag === "api" ? "API" : "Simulado"}
+    </span>
+  );
+}
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -85,12 +144,13 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                 isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
               )}
             />
-            <span className="flex flex-col">
+            <span className="flex min-w-0 flex-col">
               <span className="font-medium leading-tight">{item.label}</span>
-              <span className="text-[11px] leading-tight text-muted-foreground/70">
+              <span className="truncate text-[11px] leading-tight text-muted-foreground/70">
                 {item.description}
               </span>
             </span>
+            {item.tag && <NavTag tag={item.tag} />}
           </Link>
         );
       })}
@@ -124,7 +184,9 @@ export function Sidebar() {
         <NavLinks />
         <div className="border-t border-white/[0.06] px-6 py-4">
           <p className="text-[11px] leading-relaxed text-muted-foreground/70">
-            v2.0 Alpha · Dados via brapi.dev
+            v2.0 Alpha · Módulos API: backend Investment OS
+            <br />
+            Módulos Simulado: protótipo (brapi.dev)
             <br />
             Uso educacional — não é recomendação.
           </p>
