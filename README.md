@@ -40,6 +40,24 @@ gold do backend (`python -m investment_os.cli build` para o screener e
 `python -m investment_os.cli macro` para Tesouro/macro) — quando ausentes, a
 UI mostra o motivo e o comando, nunca dados inventados.
 
+### Uso real (sem modo demonstração)
+
+O painel fala com a API real por padrão — o modo demonstração só existe com
+`NEXT_PUBLIC_IIOS_DEMO=1` explícito no build (fixtures rotuladas; ver
+`docs/INTEGRATION.md`). Para uso com dados oficiais:
+
+```bash
+# 1) Backend no ar (repo Celest.ia-v2-Alpha — guia completo em docs/DEPLOY.md):
+docker compose run --rm pipeline && docker compose up -d api
+
+# 2) Painel apontando para ele (.env.local ou env do host do painel):
+NEXT_PUBLIC_IIOS_API_URL=http://localhost:8000   # ou a URL pública da API
+# NEXT_PUBLIC_IIOS_DEMO — NÃO definir
+
+# 3) Painel hospedado? Libere a origem no CORS da API:
+# IIOS_CORS_ORIGINS=https://<painel>.vercel.app (env do backend)
+```
+
 ## Módulos do protótipo (dados simulados — selo "Simulado")
 
 | Rota | Módulo | Descrição |
