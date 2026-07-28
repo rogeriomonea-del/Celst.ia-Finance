@@ -378,7 +378,7 @@ export default function PerfilPage() {
                     "flex w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left text-sm transition-all",
                     isSelected
                       ? "border-primary/50 bg-primary/10 text-foreground"
-                      : "border-white/10 bg-surface hover:border-white/25 hover:bg-white/[0.03]"
+                      : "border-border bg-surface hover:border-slate-300 hover:bg-slate-50"
                   )}
                 >
                   <span
@@ -386,7 +386,7 @@ export default function PerfilPage() {
                       "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors",
                       isSelected
                         ? "border-primary bg-primary text-primary-foreground"
-                        : "border-white/20"
+                        : "border-border"
                     )}
                   >
                     {isSelected && <CheckCircle2 className="h-3.5 w-3.5" />}

@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import {
   BACKEND_START_COMMAND,
   IIOS_API_URL,
+  IIOS_DEMO,
   errorMessage,
   isApiError,
   isUnreachableError,
@@ -73,6 +74,96 @@ export function UnavailableValue({
 }
 
 // ---------------------------------------------------------------------------
+// Selo de origem dos dados: API real vs modo demonstração
+// ---------------------------------------------------------------------------
+
+function SourceBadge({ onGradient = false }: { onGradient?: boolean }) {
+  if (IIOS_DEMO) {
+    return (
+      <Badge
+        variant="warning"
+        title="Modo demonstração: dados ilustrativos congelados — NÃO são dados reais"
+      >
+        DEMONSTRAÇÃO
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      className={
+        onGradient
+          ? "border-transparent bg-white/15 text-white ring-1 ring-white/25"
+          : undefined
+      }
+      title="Dados reais servidos pela API do backend Investment Intelligence OS"
+    >
+      API
+    </Badge>
+  );
+}
+
+function SourceNote({ className }: { className?: string }) {
+  if (IIOS_DEMO) {
+    return (
+      <p className={className}>
+        MODO DEMONSTRAÇÃO: dados ilustrativos congelados — NÃO são dados
+        reais nem provêm de fontes oficiais (CVM, B3, Tesouro, BCB). Para
+        dados reais, rode o backend e desative{" "}
+        <span className="font-mono">NEXT_PUBLIC_IIOS_DEMO</span>.
+      </p>
+    );
+  }
+  return (
+    <p className={className}>
+      Fonte dos dados: API do backend Investment Intelligence OS em{" "}
+      <span className="font-mono">{IIOS_API_URL}</span> — nenhum dado é
+      simulado nesta tela.
+    </p>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Hero em gradiente (design Celestia Flights) — usado na visão geral
+// ---------------------------------------------------------------------------
+
+export function PageHero({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}) {
+  return (
+    <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 px-6 py-10 text-white shadow-lg animate-fade-in-up sm:px-10">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+      >
+        <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-28 right-0 h-72 w-72 rounded-full bg-violet-400/20 blur-3xl" />
+      </div>
+      <div className="relative max-w-3xl space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25">
+            <Icon className="h-5 w-5" aria-hidden />
+          </span>
+          <SourceBadge onGradient />
+        </div>
+        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+          {title}
+        </h1>
+        <p className="text-sm leading-relaxed text-indigo-100 sm:text-base">
+          {description}
+        </p>
+        <SourceNote className="text-xs text-indigo-200/90" />
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Cabeçalho de página com selo API
 // ---------------------------------------------------------------------------
 
@@ -90,16 +181,10 @@ export function ApiPageHeader({
       <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
         <Icon className="h-6 w-6 text-primary" aria-hidden />
         {title}
-        <Badge title="Dados reais servidos pela API do backend Investment Intelligence OS">
-          API
-        </Badge>
+        <SourceBadge />
       </h1>
       <p className="text-sm text-muted-foreground">{description}</p>
-      <p className="text-xs text-muted-foreground/70">
-        Fonte dos dados: API do backend Investment Intelligence OS em{" "}
-        <span className="font-mono">{IIOS_API_URL}</span> — nenhum dado é
-        simulado nesta tela.
-      </p>
+      <SourceNote className="text-xs text-muted-foreground/70" />
     </div>
   );
 }
@@ -149,7 +234,7 @@ export function ApiErrorState({
         </div>
 
         {unreachable && (
-          <div className="w-full rounded-xl border border-white/10 bg-surface-raised p-3 text-sm">
+          <div className="w-full rounded-xl border border-border bg-surface-raised p-3 text-sm">
             <p className="text-muted-foreground">
               Inicie o backend no repositório{" "}
               <span className="font-mono">Celest.ia-v2-Alpha</span>:
@@ -190,7 +275,7 @@ export function EmptyState({
   return (
     <Card>
       <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-muted-foreground ring-1 ring-white/10">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-muted-foreground ring-1 ring-slate-200">
           <Icon className="h-5 w-5" aria-hidden />
         </div>
         <p className="font-medium">{title}</p>
@@ -245,7 +330,7 @@ export function MetaFooter({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-white/[0.06] bg-surface px-4 py-3 text-xs text-muted-foreground",
+        "flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-border bg-surface px-4 py-3 text-xs text-muted-foreground",
         className
       )}
     >
@@ -276,7 +361,7 @@ export const NativeSelect = React.forwardRef<
   <select
     ref={ref}
     className={cn(
-      "flex h-9 w-full appearance-none rounded-xl border border-white/10 bg-surface-raised px-3 py-1 pr-8 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+      "flex h-9 w-full appearance-none rounded-xl border border-border bg-surface-raised px-3 py-1 pr-8 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
       className
     )}
     style={{
@@ -300,16 +385,16 @@ export function PageSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true" aria-live="polite">
       <div className="space-y-2">
-        <div className="h-8 w-80 animate-pulse rounded-xl bg-white/5" />
-        <div className="h-4 w-96 animate-pulse rounded-xl bg-white/5" />
+        <div className="h-8 w-80 animate-pulse rounded-xl bg-slate-200/70" />
+        <div className="h-4 w-96 animate-pulse rounded-xl bg-slate-200/70" />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-24 animate-pulse rounded-xl bg-white/5" />
+          <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-200/70" />
         ))}
       </div>
-      <div className="h-72 animate-pulse rounded-xl bg-white/5" />
-      <div className="h-56 animate-pulse rounded-xl bg-white/5" />
+      <div className="h-72 animate-pulse rounded-xl bg-slate-200/70" />
+      <div className="h-56 animate-pulse rounded-xl bg-slate-200/70" />
       <span className="sr-only">Carregando dados da API…</span>
     </div>
   );

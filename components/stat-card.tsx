@@ -42,7 +42,7 @@ export function StatCard({
             "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1",
             tone === "profit" && "bg-profit/10 text-profit ring-profit/20",
             tone === "loss" && "bg-loss/10 text-loss ring-loss/20",
-            tone === "default" && "bg-white/5 text-muted-foreground ring-white/10"
+            tone === "default" && "bg-slate-100 text-muted-foreground ring-slate-200"
           )}
         >
           <Icon className="h-4 w-4" />

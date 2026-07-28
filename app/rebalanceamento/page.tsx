@@ -232,7 +232,7 @@ export default function RebalanceamentoPage() {
               <span
                 className={cn(
                   "font-medium tabular-nums",
-                  summary.isValid ? "text-profit" : "text-amber-400"
+                  summary.isValid ? "text-profit" : "text-amber-600"
                 )}
               >
                 {formatPercentPlain(summary.targetSum)}
@@ -261,7 +261,7 @@ export default function RebalanceamentoPage() {
               {groups.map((group) => (
                 <div
                   key={group.key}
-                  className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-surface px-3 py-2.5"
+                  className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{group.label}</p>

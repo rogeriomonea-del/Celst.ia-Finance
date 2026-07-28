@@ -94,7 +94,7 @@ export function UploadDropzone({
         busy && "pointer-events-auto cursor-wait opacity-80",
         isDragging
           ? "border-primary/60 bg-primary/5"
-          : "border-white/15 bg-surface hover:border-white/30 hover:bg-white/[0.02]"
+          : "border-border bg-surface hover:border-slate-300 hover:bg-slate-50"
       )}
     >
       <input
@@ -114,7 +114,7 @@ export function UploadDropzone({
           "flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-colors",
           isDragging
             ? "bg-primary/15 text-primary ring-primary/30"
-            : "bg-white/5 text-muted-foreground ring-white/10 group-hover:text-foreground"
+            : "bg-slate-100 text-muted-foreground ring-slate-200 group-hover:text-foreground"
         )}
       >
         {busy ? (

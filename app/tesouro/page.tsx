@@ -271,7 +271,7 @@ export default function TesouroPage() {
         <CardContent className="space-y-4">
           <div
             role="note"
-            className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm"
+            className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm"
           >
             {notasRadar.length > 0 ? (
               notasRadar.map((nota) => <p key={nota}>{nota}</p>)
@@ -395,7 +395,7 @@ export default function TesouroPage() {
           {cenarios && !cenariosLoading && (
             <>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-xl border border-white/[0.06] bg-surface-raised p-3">
+                <div className="rounded-xl border border-border bg-surface-raised p-3">
                   <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
                     Duration Macaulay
                   </p>
@@ -403,7 +403,7 @@ export default function TesouroPage() {
                     {formatNumber(cenarios.risco.duration_macaulay_anos)} anos
                   </p>
                 </div>
-                <div className="rounded-xl border border-white/[0.06] bg-surface-raised p-3">
+                <div className="rounded-xl border border-border bg-surface-raised p-3">
                   <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
                     Duration modificada
                   </p>
@@ -411,7 +411,7 @@ export default function TesouroPage() {
                     {formatNumber(cenarios.risco.modified_duration_anos)} anos
                   </p>
                 </div>
-                <div className="rounded-xl border border-white/[0.06] bg-surface-raised p-3">
+                <div className="rounded-xl border border-border bg-surface-raised p-3">
                   <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
                     DV01
                   </p>
@@ -421,7 +421,7 @@ export default function TesouroPage() {
                     })}
                   </p>
                 </div>
-                <div className="rounded-xl border border-white/[0.06] bg-surface-raised p-3">
+                <div className="rounded-xl border border-border bg-surface-raised p-3">
                   <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
                     Convexidade
                   </p>
@@ -641,7 +641,7 @@ export default function TesouroPage() {
 
       <div
         role="note"
-        className="rounded-xl border border-white/[0.06] bg-surface px-4 py-3 text-xs text-muted-foreground"
+        className="rounded-xl border border-border bg-surface px-4 py-3 text-xs text-muted-foreground"
       >
         Metodologia: as taxas exibidas são as ofertadas ao varejo pelo Tesouro
         Direto (CSV oficial do Tesouro Transparente) — NÃO representam a curva

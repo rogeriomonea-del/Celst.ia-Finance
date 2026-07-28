@@ -343,7 +343,7 @@ export default function PoliticaPage() {
                 {pendingQuestions.length} pergunta(s) pendente(s) segundo o
                 backend
               </p>
-              <Card className="border-white/10 bg-surface-raised">
+              <Card className="border-border bg-surface-raised">
                 <CardHeader>
                   <Badge variant="muted" className="w-fit">
                     {humanizeKey(currentQuestion.dimension)}
@@ -362,7 +362,7 @@ export default function PoliticaPage() {
                       type="button"
                       disabled={quizBusy}
                       onClick={() => void answerQuestion(currentQuestion, option)}
-                      className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-surface px-4 py-3 text-left text-sm transition-all hover:border-white/25 hover:bg-white/[0.03] disabled:cursor-wait disabled:opacity-60"
+                      className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left text-sm transition-all hover:border-slate-300 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
                     >
                       {option}
                     </button>
@@ -395,7 +395,7 @@ export default function PoliticaPage() {
                 {Object.entries(assessment.scores).map(([dimension, score]) => (
                   <div
                     key={dimension}
-                    className="space-y-1.5 rounded-xl border border-white/[0.06] bg-surface-raised p-4"
+                    className="space-y-1.5 rounded-xl border border-border bg-surface-raised p-4"
                   >
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">
@@ -421,9 +421,9 @@ export default function PoliticaPage() {
               {assessment.conflicts.length > 0 && (
                 <div
                   role="alert"
-                  className="space-y-1 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4"
+                  className="space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-4"
                 >
-                  <p className="flex items-center gap-2 text-sm font-medium text-amber-400">
+                  <p className="flex items-center gap-2 text-sm font-medium text-amber-600">
                     <ShieldAlert className="h-4 w-4" aria-hidden />
                     Conflitos detectados entre respostas
                   </p>
@@ -479,7 +479,7 @@ export default function PoliticaPage() {
         <CardContent className="space-y-5">
           <div
             role="note"
-            className="flex items-start gap-2 rounded-xl border border-white/10 bg-surface-raised px-4 py-3 text-sm text-muted-foreground"
+            className="flex items-start gap-2 rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm text-muted-foreground"
           >
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
             <span>
@@ -502,7 +502,7 @@ export default function PoliticaPage() {
               </span>
             </div>
           ) : (
-            <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+            <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-300">
               Nenhuma IPS confirmada até o momento — o plano de aportes
               permanece bloqueado.
             </p>
@@ -575,7 +575,7 @@ export default function PoliticaPage() {
               spellCheck={false}
               rows={14}
               placeholder="Gere um rascunho ou carregue uma versão do histórico para editar o JSON da IPS aqui (faixas por classe com mín/máx, limites, bandas, aporte mensal)…"
-              className="w-full rounded-xl border border-white/10 bg-surface-raised p-4 font-mono text-xs leading-relaxed text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="w-full rounded-xl border border-border bg-surface-raised p-4 font-mono text-xs leading-relaxed text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               aria-describedby="ips-editor-help"
             />
             <p id="ips-editor-help" className="text-xs text-muted-foreground/70">

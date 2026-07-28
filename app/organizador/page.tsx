@@ -226,7 +226,7 @@ export default function OrganizadorPage() {
                 bankConnections.map((connection) => (
                   <div
                     key={connection.bankId}
-                    className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-surface px-3.5 py-3"
+                    className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">
@@ -309,7 +309,7 @@ export default function OrganizadorPage() {
                     "rounded-xl border px-3 py-2 text-sm font-medium transition-colors",
                     type === "despesa"
                       ? "border-loss/40 bg-loss/10 text-loss"
-                      : "border-white/10 text-muted-foreground hover:text-foreground"
+                      : "border-border text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Despesa
@@ -324,7 +324,7 @@ export default function OrganizadorPage() {
                     "rounded-xl border px-3 py-2 text-sm font-medium transition-colors",
                     type === "receita"
                       ? "border-profit/40 bg-profit/10 text-profit"
-                      : "border-white/10 text-muted-foreground hover:text-foreground"
+                      : "border-border text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Receita
@@ -349,7 +349,7 @@ export default function OrganizadorPage() {
                   id="categoria"
                   value={category}
                   onChange={(event) => setCategory(event.target.value)}
-                  className="flex h-9 w-full rounded-xl border border-white/10 bg-surface-raised px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="flex h-9 w-full rounded-xl border border-border bg-surface-raised px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   {availableCategories.map((option) => (
                     <option key={option} value={option} className="bg-surface-raised">

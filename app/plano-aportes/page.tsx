@@ -130,7 +130,7 @@ function ViolationList({ violations }: { violations: PolicyViolation[] }) {
       {violations.map((violation, index) => (
         <li
           key={`${violation.tipo}-${violation.chave}-${index}`}
-          className="flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.06] bg-surface-raised px-3 py-2 text-sm"
+          className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm"
         >
           <Badge
             variant={
@@ -287,7 +287,7 @@ export default function PlanoAportesPage() {
       />
 
       {!confirmedPolicy && !policyNotConfirmed && (
-        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+        <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-300">
           Não há IPS confirmada no backend — a geração do plano será recusada
           até que uma versão seja confirmada em Política.
         </p>
@@ -350,10 +350,10 @@ export default function PlanoAportesPage() {
       )}
 
       {policyNotConfirmed && (
-        <Card className="border-amber-500/40">
+        <Card className="border-amber-300">
           <CardContent className="flex flex-col items-start gap-4 p-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600 ring-1 ring-amber-300">
                 <Scale className="h-5 w-5" aria-hidden />
               </div>
               <div>
@@ -683,7 +683,7 @@ export default function PlanoAportesPage() {
                               </span>
                             )}
                             {acao.custo_imposto && (
-                              <span className="mt-0.5 block text-[11px] text-amber-400/90">
+                              <span className="mt-0.5 block text-[11px] text-amber-600/90">
                                 Custo/imposto: {acao.custo_imposto}
                               </span>
                             )}
@@ -784,7 +784,7 @@ export default function PlanoAportesPage() {
                   )}
                 </div>
                 {plan.qualidade_dados && (
-                  <p className="border-t border-white/[0.06] pt-3 text-xs text-muted-foreground/80">
+                  <p className="border-t border-border pt-3 text-xs text-muted-foreground/80">
                     Qualidade dos dados: cobertura de{" "}
                     {formatPercentPlain(plan.qualidade_dados.cobertura_pct)} (
                     {plan.qualidade_dados.posicoes_precificadas} de{" "}

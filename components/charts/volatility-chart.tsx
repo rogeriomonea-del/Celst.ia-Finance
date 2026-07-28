@@ -17,7 +17,7 @@ import {
   ChartTooltipFrame,
 } from "@/components/charts/chart-tooltip";
 
-const VOLATILITY_HUE = "#3b82f6";
+const VOLATILITY_HUE = "#4f46e5";
 
 interface VolatilityChartProps {
   data: VolatilityPoint[];

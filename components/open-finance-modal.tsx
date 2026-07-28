@@ -119,10 +119,10 @@ export function OpenFinanceModal({
                       setStage("consent");
                     }}
                     className={cn(
-                      "flex items-center gap-3 rounded-xl border border-white/10 bg-surface px-4 py-3 text-left transition-colors",
+                      "flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left transition-colors",
                       alreadyConnected
                         ? "cursor-not-allowed opacity-50"
-                        : "hover:border-white/25 hover:bg-white/[0.03]"
+                        : "hover:border-slate-300 hover:bg-slate-50"
                     )}
                   >
                     <span
@@ -165,7 +165,7 @@ export function OpenFinanceModal({
                 </li>
               ))}
             </ul>
-            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-slate-50 px-3 py-2.5 text-xs text-muted-foreground">
               <LockKeyhole className="h-4 w-4 shrink-0 text-primary" />
               Conexão criptografada de ponta a ponta, regulada pelo Banco
               Central (Resolução Conjunta nº 1/2020).
@@ -198,7 +198,7 @@ export function OpenFinanceModal({
                     ) : isCurrent ? (
                       <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
                     ) : (
-                      <span className="h-4 w-4 shrink-0 rounded-full border border-white/15" />
+                      <span className="h-4 w-4 shrink-0 rounded-full border border-border" />
                     )}
                     <span
                       className={cn(
@@ -229,7 +229,7 @@ export function OpenFinanceModal({
                 Transações dos últimos 90 dias importadas para o organizador.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3 rounded-xl border border-white/10 bg-surface px-4 py-4">
+            <div className="space-y-3 rounded-xl border border-border bg-surface px-4 py-4">
               <div className="flex items-center gap-3">
                 <span
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold text-white"
@@ -244,7 +244,7 @@ export function OpenFinanceModal({
                   </span>
                 </div>
               </div>
-              <div className="flex items-baseline justify-between border-t border-white/10 pt-3">
+              <div className="flex items-baseline justify-between border-t border-border pt-3">
                 <span className="text-xs uppercase tracking-wider text-muted-foreground">
                   Saldo disponível
                 </span>

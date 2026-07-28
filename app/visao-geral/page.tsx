@@ -29,7 +29,7 @@ import {
 } from "@/lib/api/investment-os";
 import {
   ApiErrorState,
-  ApiPageHeader,
+  PageHero,
   ConfidenceBadge,
   MetaFooter,
   PageSkeleton,
@@ -66,7 +66,7 @@ function UnavailableBlock({
   command?: string;
 }) {
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+    <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">
       <p className="font-medium">Bloco indisponível</p>
       <p className="mt-1 text-muted-foreground">
         {block.motivo ?? "Motivo não informado pela API."}
@@ -113,7 +113,7 @@ function AprovadaChip({
   const pl = toFiniteNumber(aprovada.pl);
   const pvpa = toFiniteNumber(aprovada.pvpa);
   return (
-    <li className="rounded-xl border border-white/10 bg-surface-raised px-3 py-2">
+    <li className="rounded-xl border border-border bg-surface-raised px-3 py-2">
       <p className="font-mono text-sm font-semibold">{aprovada.ticker}</p>
       <p className="truncate text-xs text-muted-foreground" title={aprovada.empresa}>
         {aprovada.empresa}
@@ -149,7 +149,7 @@ function FreshnessRow({
   const hours = hoursSince(iso, nowMs);
   const stale = hours !== null && hours > STALE_LIMIT_HOURS;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-surface-raised px-3 py-2 text-sm">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm">
       <span className="text-muted-foreground">{label}</span>
       <span className="flex items-center gap-2">
         {iso ? (
@@ -192,7 +192,7 @@ export default function VisaoGeralPage() {
   }, [load]);
 
   const header = (
-    <ApiPageHeader icon={Gauge} title="Visão geral" description={PAGE_DESCRIPTION} />
+    <PageHero icon={Gauge} title="Visão geral" description={PAGE_DESCRIPTION} />
   );
 
   const screener = overview?.screener ?? null;
@@ -358,7 +358,7 @@ export default function VisaoGeralPage() {
                   {macro.regimes.map((regime) => (
                     <li
                       key={regime.dimensao}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-surface-raised px-3 py-2 text-sm"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm"
                     >
                       <span>
                         <span className="text-muted-foreground">
@@ -368,7 +368,7 @@ export default function VisaoGeralPage() {
                           {humanizeKey(regime.estado)}
                         </span>
                         {regime.eh_expectativa && (
-                          <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-400">
+                          <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-600">
                             expectativa de mercado — não é fato
                           </span>
                         )}

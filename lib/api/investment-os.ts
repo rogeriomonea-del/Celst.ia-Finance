@@ -10,6 +10,14 @@
 export const IIOS_API_URL =
   process.env.NEXT_PUBLIC_IIOS_API_URL ?? "http://localhost:8000";
 
+/**
+ * MODO DEMONSTRAÇÃO (`NEXT_PUBLIC_IIOS_DEMO=1`): serve fixtures congeladas e
+ * rotuladas de `demo-data.ts` no lugar da API — para prévias sem backend.
+ * NUNCA é ativado silenciosamente: exige a variável explícita no build e a
+ * UI exibe banner "DEMONSTRAÇÃO" em todas as telas.
+ */
+export const IIOS_DEMO = process.env.NEXT_PUBLIC_IIOS_DEMO === "1";
+
 const BASE = `${IIOS_API_URL.replace(/\/+$/, "")}/v1`;
 
 export const BACKEND_START_COMMAND = "uvicorn investment_os.api.main:app";
@@ -650,6 +658,12 @@ interface ErrorDetailShape {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (IIOS_DEMO) {
+    // Import dinâmico: mantém as fixtures fora do bundle quando o modo está off.
+    const { demoRequest } = await import("./demo-data");
+    return demoRequest<T>(path, init);
+  }
+
   let response: Response;
   try {
     response = await fetch(`${BASE}${path}`, { cache: "no-store", ...init });

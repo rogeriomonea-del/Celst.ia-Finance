@@ -79,7 +79,7 @@ function RegimeCard({ regime }: { regime: MacroRegime }) {
   const indisponivel = isRegimeIndisponivel(regime);
 
   return (
-    <Card className={expectativa ? "border-amber-500/40" : undefined}>
+    <Card className={expectativa ? "border-amber-300" : undefined}>
       <CardContent className="space-y-3 p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -89,7 +89,7 @@ function RegimeCard({ regime }: { regime: MacroRegime }) {
         </div>
 
         {indisponivel ? (
-          <div className="rounded-xl border border-white/[0.06] bg-surface-raised p-3 text-sm">
+          <div className="rounded-xl border border-border bg-surface-raised p-3 text-sm">
             <p>
               <UnavailableValue label="Estado indisponível" />
             </p>
@@ -107,8 +107,8 @@ function RegimeCard({ regime }: { regime: MacroRegime }) {
         <div
           className={
             expectativa
-              ? "rounded-xl border border-amber-500/30 bg-amber-500/10 p-3"
-              : "rounded-xl border border-white/[0.06] bg-surface-raised p-3"
+              ? "rounded-xl border border-amber-300 bg-amber-50 p-3"
+              : "rounded-xl border border-border bg-surface-raised p-3"
           }
         >
           {expectativa && (
@@ -148,7 +148,7 @@ function SerieBlock({
 }) {
   const ultimo = pontos && pontos.length > 0 ? pontos[pontos.length - 1] : null;
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-surface-raised p-4">
+    <div className="rounded-xl border border-border bg-surface-raised p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm font-medium">
           {titulo}{" "}
@@ -260,10 +260,10 @@ export default function MacroPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-amber-500/30">
+        <Card className="border-amber-300">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldOff className="h-4 w-4 text-amber-400" aria-hidden />
+              <ShieldOff className="h-4 w-4 text-amber-600" aria-hidden />
               Fora do escopo desta fase
             </CardTitle>
             <CardDescription>
@@ -313,7 +313,7 @@ export default function MacroPage() {
       </Card>
 
       <div
-        className="flex items-start gap-2 rounded-xl border border-white/[0.06] bg-surface px-4 py-3 text-xs text-muted-foreground"
+        className="flex items-start gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-xs text-muted-foreground"
         role="note"
       >
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />

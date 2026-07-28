@@ -23,6 +23,23 @@ recalcula indicadores (o motor determinístico vive no backend).
 4. Dados simulados do protótipo devem ter selo visível "SIMULADO" até serem
    substituídos por estes endpoints.
 
+## Modo demonstração (`NEXT_PUBLIC_IIOS_DEMO=1`)
+
+Para prévias hospedadas SEM backend (ex.: Vercel), o build pode ser feito com
+`NEXT_PUBLIC_IIOS_DEMO=1`: o cliente tipado passa a servir fixtures congeladas
+e rotuladas de `lib/api/demo-data.ts` no lugar de chamadas HTTP.
+
+- Nunca é ativado silenciosamente: exige a variável explícita no build.
+- A UI exibe banner global "MODO DEMONSTRAÇÃO", chip no header e selo
+  "DEMONSTRAÇÃO" no lugar do selo "API" em todas as telas conectadas —
+  cumprindo a regra nº 1 (nenhum dado simulado exibido como real).
+- Todos os campos de fonte das fixtures dizem "DEMONSTRAÇÃO — fixture
+  ilustrativa"; valores têm ordem de grandeza plausível, mas são estáticos.
+- Mutações que exigem estado real (avaliar perfil, confirmar IPS, importar
+  extrato) respondem 503 `demo_mode` com instrução de rodar o backend.
+- A cotação intradiária responde 503 `intradiario_indisponivel` (a UI exibe
+  o fallback de fechamento ilustrativo D-1, sem esconder o erro).
+
 ## Endpoints da Fase 5 (perfil, IPS, importação, carteira, rebalanceamento)
 
 Consumidos pelas telas `/politica`, `/importacao`, `/carteira` e

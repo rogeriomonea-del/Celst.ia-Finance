@@ -499,12 +499,12 @@ export default function ImportacaoPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {problemRows.length > 0 && (
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm">
                   <input
                     type="checkbox"
                     checked={acceptPartial}
                     onChange={(event) => setAcceptPartial(event.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-white/20 bg-surface accent-emerald-500"
+                    className="mt-0.5 h-4 w-4 rounded border-border bg-surface accent-emerald-500"
                   />
                   <span>
                     Aceitar importação parcial ({problemRows.length} linha(s)

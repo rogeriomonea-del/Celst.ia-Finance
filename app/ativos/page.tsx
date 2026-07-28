@@ -112,7 +112,7 @@ function TipoChip({
         "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         active
           ? "border-primary/40 bg-primary/15 text-primary"
-          : "border-white/10 bg-surface-raised text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+          : "border-border bg-surface-raised text-muted-foreground hover:bg-slate-100 hover:text-foreground"
       )}
     >
       {label}
@@ -120,7 +120,7 @@ function TipoChip({
         <span
           className={cn(
             "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums",
-            active ? "bg-primary/20" : "bg-white/[0.06]"
+            active ? "bg-primary/20" : "bg-slate-200"
           )}
         >
           {count.toLocaleString("pt-BR")}
@@ -158,9 +158,9 @@ function IntradiarioResult({
     const indisponivel = isApiError(state.error, "intradiario_indisponivel");
     return (
       <div className="space-y-3" role="alert">
-        <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+        <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
           <AlertTriangle
-            className="mt-0.5 h-4 w-4 shrink-0 text-amber-400"
+            className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
             aria-hidden
           />
           <div>
@@ -184,7 +184,7 @@ function IntradiarioResult({
         </div>
 
         {indisponivel && (
-          <div className="rounded-xl border border-white/[0.06] bg-surface-raised p-3 text-sm">
+          <div className="rounded-xl border border-border bg-surface-raised p-3 text-sm">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Fallback — fechamento oficial D-1
             </p>
@@ -265,15 +265,15 @@ function IntradiarioResult({
         )}
       </p>
 
-      <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+      <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs">
         <AlertTriangle
-          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400"
+          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600"
           aria-hidden
         />
         <p>{intradiario.aviso}</p>
       </div>
 
-      <div className="rounded-xl border border-white/[0.06] bg-surface-raised p-3 text-sm">
+      <div className="rounded-xl border border-border bg-surface-raised p-3 text-sm">
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Fechamento oficial D-1 (comparação)
         </p>
@@ -629,7 +629,7 @@ export default function AtivosPage() {
                           <TableRow className="hover:bg-transparent">
                             <TableCell
                               colSpan={7}
-                              className="bg-white/[0.02] p-4"
+                              className="bg-slate-50 p-4"
                             >
                               <div aria-live="polite">
                                 <IntradiarioResult
@@ -683,7 +683,7 @@ export default function AtivosPage() {
 
       <div
         role="note"
-        className="flex items-start gap-2 rounded-xl border border-white/[0.06] bg-surface px-4 py-3 text-xs text-muted-foreground"
+        className="flex items-start gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-xs text-muted-foreground"
       >
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         <p>

@@ -65,7 +65,7 @@ export function WeightBars({
             </span>
           </div>
           <div
-            className="h-1.5 w-full overflow-hidden rounded-full bg-white/5"
+            className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
             role="presentation"
           >
             <div

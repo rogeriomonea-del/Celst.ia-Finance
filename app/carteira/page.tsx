@@ -82,7 +82,7 @@ function ViolationCard({ violation }: { violation: PolicyViolation }) {
       className={
         critical
           ? "rounded-xl border border-loss/40 bg-loss/10 p-4"
-          : "rounded-xl border border-amber-500/30 bg-amber-500/10 p-4"
+          : "rounded-xl border border-amber-300 bg-amber-50 p-4"
       }
       role={critical ? "alert" : undefined}
     >

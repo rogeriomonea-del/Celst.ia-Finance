@@ -98,7 +98,7 @@ function ListaBloco({
   vazio: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-surface-raised p-3">
+    <div className="rounded-xl border border-border bg-surface-raised p-3">
       <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         {titulo}
       </p>
@@ -152,7 +152,7 @@ function RespostaEstruturadaBlocos({
       </div>
 
       {/* Evidências */}
-      <div className="rounded-xl border border-white/[0.06] bg-surface-raised p-3">
+      <div className="rounded-xl border border-border bg-surface-raised p-3">
         <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Evidências
         </p>
@@ -203,7 +203,7 @@ function RespostaEstruturadaBlocos({
       </div>
 
       {/* Fontes + data-base */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.06] bg-surface-raised p-3 text-xs">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-raised p-3 text-xs">
         <span className="font-medium uppercase tracking-wider text-muted-foreground">
           Fontes:
         </span>
@@ -240,8 +240,8 @@ function RespostaEstruturadaBlocos({
       </div>
 
       {/* Contra-argumento — bloco visualmente distinto */}
-      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
-        <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-amber-400">
+      <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+        <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-amber-600">
           <Scale className="h-3.5 w-3.5" aria-hidden />
           Contra-argumento (red-team)
         </p>
@@ -270,12 +270,12 @@ function RespostaEstruturadaBlocos({
       </div>
 
       {/* Trace de ferramentas */}
-      <details className="group rounded-xl border border-white/[0.06] bg-surface-raised">
+      <details className="group rounded-xl border border-border bg-surface-raised">
         <summary className="cursor-pointer select-none rounded-xl px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Wrench className="mr-1.5 inline h-3.5 w-3.5" aria-hidden />
           Ferramentas consultadas ({ferramentas.length})
         </summary>
-        <div className="border-t border-white/[0.06] p-3">
+        <div className="border-t border-border p-3">
           {ferramentas.length === 0 ? (
             <p className="text-xs text-muted-foreground/70">
               Nenhuma ferramenta foi chamada nesta resposta.
@@ -297,7 +297,7 @@ function RespostaEstruturadaBlocos({
                     </Badge>
                   )}
                   {Object.keys(chamada.argumentos).length > 0 && (
-                    <code className="max-w-full overflow-x-auto whitespace-nowrap rounded bg-white/5 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                    <code className="max-w-full overflow-x-auto whitespace-nowrap rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
                       {JSON.stringify(chamada.argumentos)}
                     </code>
                   )}
@@ -317,10 +317,10 @@ function RespostaEstruturadaBlocos({
 /** Estado dedicado: backend sem ANTHROPIC_API_KEY (503 chat_indisponivel). */
 function ChatIndisponivelState({ mensagem }: { mensagem: string }) {
   return (
-    <Card role="alert" className="border-amber-500/40">
+    <Card role="alert" className="border-amber-300">
       <CardContent className="space-y-3 p-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-200">
             <KeyRound className="h-5 w-5" aria-hidden />
           </div>
           <div>
@@ -330,7 +330,7 @@ function ChatIndisponivelState({ mensagem }: { mensagem: string }) {
             <p className="text-sm text-muted-foreground">{mensagem}</p>
           </div>
         </div>
-        <div className="rounded-xl border border-white/10 bg-surface-raised p-3 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-border bg-surface-raised p-3 text-sm text-muted-foreground">
           <p>
             O chat exige a variável{" "}
             <span className="font-mono">ANTHROPIC_API_KEY</span> no arquivo{" "}
@@ -441,10 +441,10 @@ export default function PerguntePage() {
       {/* Aviso permanente — nunca removido */}
       <div
         role="note"
-        className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm"
+        className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm"
       >
         <ShieldAlert
-          className="mt-0.5 h-4 w-4 shrink-0 text-amber-400"
+          className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
           aria-hidden
         />
         <p>{AVISO_PERMANENTE}</p>
@@ -471,7 +471,7 @@ export default function PerguntePage() {
                   key={sugestao}
                   type="button"
                   onClick={() => void enviar(sugestao)}
-                  className="rounded-full border border-white/10 bg-surface-raised px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="rounded-full border border-border bg-surface-raised px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   {sugestao}
                 </button>
@@ -511,7 +511,7 @@ export default function PerguntePage() {
 
         {enviando && (
           <div
-            className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-surface-raised px-4 py-3 text-sm text-muted-foreground"
+            className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm text-muted-foreground"
             role="status"
             aria-live="polite"
           >
@@ -597,7 +597,7 @@ export default function PerguntePage() {
                 placeholder="Ex.: Quais empresas passaram no screener? (Enter envia; Shift+Enter quebra linha)"
                 disabled={enviando}
                 className={cn(
-                  "flex w-full resize-y rounded-xl border border-white/10 bg-surface-raised px-3 py-2 text-sm shadow-sm transition-colors",
+                  "flex w-full resize-y rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm shadow-sm transition-colors",
                   "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                   "disabled:cursor-not-allowed disabled:opacity-50"
                 )}
@@ -626,13 +626,13 @@ export default function PerguntePage() {
       </Card>
 
       {/* Ferramentas disponíveis (GET /v1/chat/ferramentas) */}
-      <details className="rounded-xl border border-white/[0.06] bg-surface">
+      <details className="rounded-xl border border-border bg-surface">
         <summary className="cursor-pointer select-none rounded-xl px-4 py-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Wrench className="mr-1.5 inline h-3.5 w-3.5" aria-hidden />
           Ferramentas determinísticas disponíveis
           {ferramentas ? ` (${ferramentas.ferramentas.length})` : ""}
         </summary>
-        <div className="border-t border-white/[0.06] px-4 py-3">
+        <div className="border-t border-border px-4 py-3">
           {ferramentas ? (
             <>
               <ul className="space-y-1.5">
@@ -654,7 +654,7 @@ export default function PerguntePage() {
           ) : ferramentasErro ? (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <AlertTriangle
-                className="h-3.5 w-3.5 text-amber-400"
+                className="h-3.5 w-3.5 text-amber-600"
                 aria-hidden
               />
               Não foi possível carregar a lista de ferramentas (o chat pode

@@ -292,7 +292,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {lastParseReport && lastParseReport.warnings.length > 0 && (
-                <div className="mb-4 space-y-1 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3">
+                <div className="mb-4 space-y-1 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                   {lastParseReport.warnings.map((warning) => (
                     <p key={warning} className="text-xs text-amber-300/90">
                       {warning}
