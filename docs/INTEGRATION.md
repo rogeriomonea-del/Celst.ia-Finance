@@ -75,6 +75,30 @@ visível; rodapé do Tesouro deixa explícito que as taxas são as ofertadas ao
 varejo (Tesouro Transparente) e NÃO a curva indicativa ANBIMA; staleness de
 gold > 24h destacada na Visão geral.
 
+## Endpoints da Fase 7 (banco de ativos B3, cotação intradiária, chat)
+
+Consumidos pelas telas `/ativos` e `/pergunte` via o mesmo cliente tipado
+`lib/api/investment-os.ts` (mesma base `NEXT_PUBLIC_IIOS_API_URL`; erros
+`{detail: {code, message}}`).
+
+| Endpoint | Conteúdo |
+|---|---|
+| `GET /v1/ativos?tipo=&busca=&limite=&pagina=` | universo completo do registro B3 (~2.468 ativos): `total`/`pagina`/`limite`, `data_base`, `fonte`, contagens por tipo (`acao_br`, `fii`, `bdr`, `etf_ou_fundo`, `unit`) e lista com ticker, tipo (classificação HEURÍSTICA com `classificacao_confianca` ALTA/MEDIA/BAIXA), `cnpj_emissor`, `ultimo_pregao`, `ultimo_fechamento` (pode ser `null`; `ajustado_por_proventos: false`) e `especificacao`; 404 `registry_missing`, 422 `tipo_invalido` |
+| `GET /v1/ativos/{ticker}` | um ativo do registro + `fonte`; 404 `ativo_not_found` |
+| `GET /v1/ativos/{ticker}/intradiario` | cotação intradiária de AGREGADOR (brapi.dev — não oficial, uso indicativo; `usavel_em_calculos: false`, `aviso` e `token_configurado` sempre presentes) + bloco `oficial_d1` (fechamento oficial D-1 com pregão e fonte) + `consultado_em`; 404 `ativo_not_found`; 503 `intradiario_indisponivel` → a UI exibe o fechamento oficial D-1 como fallback SEM esconder o erro |
+| `POST /v1/chat` | body `{pergunta (3..4000), historico (máx. 20 mensagens role/content)}` → resposta ESTRUTURADA: `resposta_direta`, `evidencias` (afirmação/valor/fonte/data-base), `fontes`, `data_base`, `premissas`, `confianca` (ALTA/MEDIA/BAIXA), `riscos`, `contra_argumento`, `dados_ausentes`, `gatilhos_revisao` + `ferramentas_chamadas` (trace: ferramenta, argumentos, ok, codigo_erro) + `modelo`; 422 validação; 503 `chat_indisponivel` = backend sem `ANTHROPIC_API_KEY` (estado dedicado na UI; nenhuma outra tela depende dessa chave) |
+| `GET /v1/chat/ferramentas` | lista das ferramentas determinísticas expostas ao assistente (`nome`, `descricao`) + `nota` |
+
+Regras de exibição dessas telas: a classificação de tipo dos ativos é
+heurística — o selo de confiança acompanha cada linha e a tela explica que não
+é dado oficial; fechamentos B3 rotulados "não ajustado por proventos"; a
+cotação intradiária carrega selo "AGREGADOR — indicativo" + aviso do backend e
+NUNCA alimenta cálculos; o chat mantém aviso permanente ("o assistente não
+calcula números; não é recomendação de investimento") e renderiza TODOS os
+blocos estruturados, incluindo contra-argumento e dados ausentes — resposta
+vazia vira estado explícito, nunca é ocultada. As chaves (brapi/Anthropic)
+vivem SOMENTE no backend — nada de secret no bundle.
+
 ## Plano de substituição (Fase 3+ do roadmap do backend)
 
 1. `lib/agents/market-data.ts` → `GET /v1/screener` / `GET /v1/assets/{ticker}`.

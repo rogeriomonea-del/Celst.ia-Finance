@@ -532,6 +532,115 @@ export interface TesouroCenarios {
 }
 
 // ---------------------------------------------------------------------------
+// Tipos — Fase 7 (banco de ativos B3, cotação intradiária, chat)
+// ---------------------------------------------------------------------------
+
+/** Tipos de ativo do registro B3 (chaves do bloco `tipos` de /v1/ativos). */
+export type TipoAtivoB3 = "acao_br" | "fii" | "bdr" | "etf_ou_fundo" | "unit";
+
+export interface AtivoB3 {
+  ticker: string;
+  /** Classificação HEURÍSTICA do backend (ver `classificacao_confianca`). */
+  tipo: string;
+  /** Confiança da classificação heurística do tipo — não é dado oficial. */
+  classificacao_confianca: Confianca;
+  cnpj_emissor: string | null;
+  ultimo_pregao: string;
+  /** Fechamento B3 NÃO ajustado por proventos; ausência = `null`, nunca 0. */
+  ultimo_fechamento: number | null;
+  especificacao: string;
+  ajustado_por_proventos: boolean;
+}
+
+export interface AtivosPage {
+  total: number;
+  pagina: number;
+  limite: number;
+  data_base: string;
+  fonte: string;
+  tipos: Partial<Record<TipoAtivoB3, number>> & Record<string, number>;
+  ativos: AtivoB3[];
+}
+
+export interface AtivoDetalhe extends AtivoB3 {
+  fonte: string;
+}
+
+export interface CotacaoIntradiaria {
+  preco: number;
+  variacao_pct: number | null;
+  fechamento_anterior: number | null;
+  data_hora: string | null;
+  moeda: string;
+  /** Sempre rotulada pelo backend como AGREGADOR — nunca fonte primária. */
+  fonte: string;
+  aviso: string;
+  usavel_em_calculos: boolean;
+  token_configurado: boolean;
+}
+
+export interface FechamentoOficialD1 {
+  fechamento: number | null;
+  pregao: string;
+  fonte: string;
+}
+
+export interface AtivoIntradiario {
+  ticker: string;
+  intradiario: CotacaoIntradiaria;
+  oficial_d1: FechamentoOficialD1;
+  consultado_em: string;
+}
+
+export interface ChatMensagem {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatEvidencia {
+  afirmacao: string;
+  valor?: string | number | null;
+  fonte: string;
+  data_base?: string | null;
+}
+
+export interface ChatRespostaEstruturada {
+  resposta_direta: string;
+  evidencias: ChatEvidencia[];
+  fontes: string[];
+  data_base: string | null;
+  premissas: string[];
+  confianca: Confianca;
+  riscos: string[];
+  contra_argumento: string;
+  dados_ausentes: string[];
+  gatilhos_revisao: string[];
+}
+
+export interface ChatFerramentaChamada {
+  ferramenta: string;
+  argumentos: Record<string, unknown>;
+  ok: boolean;
+  codigo_erro: string | null;
+}
+
+export interface ChatResposta {
+  resposta: ChatRespostaEstruturada;
+  ferramentas_chamadas: ChatFerramentaChamada[];
+  modelo: string;
+}
+
+export interface ChatFerramenta {
+  nome: string;
+  descricao: string;
+}
+
+export interface ChatFerramentas {
+  ferramentas: ChatFerramenta[];
+  nota: string;
+}
+
+// ---------------------------------------------------------------------------
 // Núcleo de requisições
 // ---------------------------------------------------------------------------
 
@@ -753,6 +862,68 @@ export function fetchTesouroCenarios(
       vencimento
     )}/cenarios`
   );
+}
+
+// ---------------------------------------------------------------------------
+// Fase 7 — banco de ativos B3, cotação intradiária, chat
+// ---------------------------------------------------------------------------
+
+export interface FetchAtivosParams {
+  tipo?: string;
+  busca?: string;
+  limite?: number;
+  pagina?: number;
+}
+
+/** 404 `registry_missing` = registro gold ausente; 422 `tipo_invalido`. */
+export function fetchAtivos(params: FetchAtivosParams = {}): Promise<AtivosPage> {
+  const query = new URLSearchParams();
+  if (params.tipo) query.set("tipo", params.tipo);
+  if (params.busca) query.set("busca", params.busca);
+  if (params.limite !== undefined) query.set("limite", String(params.limite));
+  if (params.pagina !== undefined) query.set("pagina", String(params.pagina));
+  const qs = query.toString();
+  return request<AtivosPage>(`/ativos${qs ? `?${qs}` : ""}`);
+}
+
+/** 404 `ativo_not_found` quando o ticker não existe no registro. */
+export function fetchAtivo(ticker: string): Promise<AtivoDetalhe> {
+  return request<AtivoDetalhe>(`/ativos/${encodeURIComponent(ticker)}`);
+}
+
+/**
+ * Cotação intradiária de AGREGADOR (indicativa, `usavel_em_calculos: false`)
+ * + fechamento oficial D-1. 503 `intradiario_indisponivel` = exibir o
+ * fechamento oficial D-1 como fallback, SEM esconder o erro.
+ */
+export function fetchAtivoIntradiario(ticker: string): Promise<AtivoIntradiario> {
+  return request<AtivoIntradiario>(
+    `/ativos/${encodeURIComponent(ticker)}/intradiario`
+  );
+}
+
+/** Limites do contrato POST /v1/chat (validação 422 no backend). */
+export const CHAT_PERGUNTA_MIN = 3;
+export const CHAT_PERGUNTA_MAX = 4000;
+export const CHAT_HISTORICO_MAX = 20;
+
+/**
+ * Pergunta ao assistente. O LLM NUNCA calcula: só orquestra ferramentas
+ * determinísticas do backend. 503 `chat_indisponivel` = backend sem
+ * ANTHROPIC_API_KEY (estado dedicado na UI; nenhuma outra tela depende disso).
+ */
+export function askChat(
+  pergunta: string,
+  historico: ChatMensagem[] = []
+): Promise<ChatResposta> {
+  return postJson<ChatResposta>("/chat", {
+    pergunta,
+    historico: historico.slice(-CHAT_HISTORICO_MAX),
+  });
+}
+
+export function fetchChatFerramentas(): Promise<ChatFerramentas> {
+  return request<ChatFerramentas>("/chat/ferramentas");
 }
 
 // ---------------------------------------------------------------------------
