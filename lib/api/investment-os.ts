@@ -321,6 +321,215 @@ export interface PortfolioIssue {
 }
 
 // ---------------------------------------------------------------------------
+// Tipos — Fase 6 (visão geral, macro, Tesouro Direto)
+// ---------------------------------------------------------------------------
+
+/** Confiança dos regimes macro: inclui `INDISPONIVEL` além da escala da Fase 5. */
+export type ConfiancaMacro = Confianca | "INDISPONIVEL";
+
+/** Bloco declarado indisponível pelo backend (nunca inventa valores). */
+export interface IndisponivelBlock {
+  status: "indisponivel";
+  motivo?: string;
+}
+
+export function isIndisponivel(
+  block: object | IndisponivelBlock | null | undefined
+): block is IndisponivelBlock {
+  return (
+    typeof block === "object" &&
+    block !== null &&
+    "status" in block &&
+    (block as { status?: unknown }).status === "indisponivel"
+  );
+}
+
+export interface ScreenerAprovada {
+  ticker: string;
+  empresa: string;
+  /** A API pode serializar como número ou string decimal; nunca converter ausência em 0. */
+  pl: number | string | null;
+  pvpa: number | string | null;
+}
+
+export interface OverviewScreener {
+  run_date: string;
+  universo: number;
+  contagens: Record<string, number>;
+  aprovadas: ScreenerAprovada[];
+  preset: string;
+}
+
+export interface OverviewTesouroReferencia {
+  taxa_pct: number;
+  percentil_historico: number | null;
+  threshold_monitorado_pct: number;
+}
+
+export interface OverviewTesouro {
+  data_base: string;
+  n_titulos: number;
+  janelas_no_radar: number;
+  referencia_ipca2050: OverviewTesouroReferencia | null;
+}
+
+export interface OverviewMacro {
+  data_geracao: string;
+  regimes: Array<{
+    dimensao: string;
+    estado: string;
+    confianca: ConfiancaMacro;
+  }>;
+}
+
+export interface OverviewCarteira {
+  snapshots: number;
+  ultimo_snapshot_em: string | null;
+  ips_confirmada: boolean;
+}
+
+export interface SaudeDados {
+  ultima_atualizacao_gold: {
+    screener: string | null;
+    tesouro: string | null;
+    macro: string | null;
+  };
+  auditoria_ingestao: string | null;
+  nota: string;
+}
+
+export interface Overview {
+  gerado_em: string;
+  screener: OverviewScreener | IndisponivelBlock;
+  tesouro: OverviewTesouro | IndisponivelBlock;
+  macro: OverviewMacro | IndisponivelBlock;
+  carteira: OverviewCarteira | IndisponivelBlock;
+  saude_dados: SaudeDados;
+}
+
+export interface SeriePonto {
+  data: string;
+  valor: number;
+}
+
+export interface MacroRegime {
+  dimensao: string;
+  estado: string;
+  detalhe: string;
+  confianca: ConfiancaMacro;
+  data_base: string | null;
+  fonte: string;
+  natureza: string;
+}
+
+export interface MacroRegimes {
+  data_geracao: string;
+  regimes: MacroRegime[];
+  series_recentes: Record<string, SeriePonto[]>;
+  premissas: string[];
+  fontes: Record<string, string>;
+  fora_do_escopo_desta_fase: string[];
+}
+
+export interface MacroSerie {
+  serie_id: string;
+  pontos: SeriePonto[];
+  fonte: string;
+}
+
+export interface TesouroHistorico {
+  pregoes: number;
+  primeiro: string;
+  percentil_taxa_atual: number;
+  maxima: number;
+  minima: number;
+  media: number;
+  mediana: number;
+}
+
+export interface TesouroTitulo {
+  tipo: string;
+  vencimento: string;
+  data_base: string;
+  taxa_compra_pct: number;
+  taxa_venda_pct: number | null;
+  pu_compra: number | null;
+  pu_venda: number | null;
+  fonte: string;
+  modelado: boolean;
+  termo?: "real" | "nominal";
+  duration_macaulay_anos?: number;
+  modified_duration_anos?: number;
+  dv01_brl?: number;
+  convexidade?: number;
+  motivo_nao_modelado?: string;
+  historico?: TesouroHistorico;
+}
+
+export interface CurvaPonto {
+  vencimento: string;
+  taxa_pct: number;
+  tipo: string;
+}
+
+export interface RadarJanela {
+  tipo: string;
+  vencimento: string;
+  taxa_atual_pct: number;
+  percentil: number;
+  criterio: string;
+  saida_hysteresis_pct: number;
+  invalidacao: string;
+  nota: string;
+  confianca: ConfiancaMacro;
+}
+
+export interface ParametrosRadar {
+  percentil_entrada: number;
+  percentil_saida_hysteresis: number;
+  min_pregoes: number;
+}
+
+export interface TesouroPainel {
+  data_base: string;
+  fonte: string;
+  titulos: TesouroTitulo[];
+  curvas: {
+    nominal_prefixado: CurvaPonto[];
+    real_ipca: CurvaPonto[];
+    nota: string;
+  };
+  radar_janelas: RadarJanela[];
+  parametros_radar: ParametrosRadar;
+  historico_oficial_desde: string;
+}
+
+export interface CenarioMTM {
+  choque_bps: number;
+  taxa_pct: number;
+  pu_novo: number;
+  variacao_pct: number;
+  efeito_duration_brl: number;
+  efeito_convexidade_brl: number;
+  residuo_brl: number;
+}
+
+export interface TesouroCenarios {
+  tipo: string;
+  vencimento: string;
+  data_base: string;
+  taxa_atual_pct: number;
+  risco: {
+    duration_macaulay_anos: number;
+    modified_duration_anos: number;
+    dv01_brl: number;
+    convexidade: number;
+  };
+  cenarios_mtm: CenarioMTM[];
+  fonte: string;
+}
+
+// ---------------------------------------------------------------------------
 // Núcleo de requisições
 // ---------------------------------------------------------------------------
 
@@ -513,6 +722,38 @@ export function fetchPortfolioIssues(): Promise<PortfolioIssue[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Fase 6 — visão geral, macro, Tesouro Direto
+// ---------------------------------------------------------------------------
+
+export function fetchOverview(): Promise<Overview> {
+  return request<Overview>("/overview");
+}
+
+export function fetchMacroRegimes(): Promise<MacroRegimes> {
+  return request<MacroRegimes>("/macro/regimes");
+}
+
+export function fetchMacroSerie(serieId: string): Promise<MacroSerie> {
+  return request<MacroSerie>(`/macro/series/${encodeURIComponent(serieId)}`);
+}
+
+export function fetchTesouroTitulos(): Promise<TesouroPainel> {
+  return request<TesouroPainel>("/tesouro/titulos");
+}
+
+/** `tipo` contém espaços (ex.: "Tesouro IPCA+") — sempre codificado na URL. */
+export function fetchTesouroCenarios(
+  tipo: string,
+  vencimento: string
+): Promise<TesouroCenarios> {
+  return request<TesouroCenarios>(
+    `/tesouro/titulos/${encodeURIComponent(tipo)}/${encodeURIComponent(
+      vencimento
+    )}/cenarios`
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Utilitários de exibição (não calculam indicadores; só normalizam formatos)
 // ---------------------------------------------------------------------------
 
@@ -530,4 +771,16 @@ export function fontesToList(
 export function faixaToLabel(faixa: PolicyViolation["faixa"]): string | null {
   if (!faixa || typeof faixa !== "object") return null;
   return `${faixa.min_pct ?? "?"}–${faixa.max_pct ?? "?"}%`;
+}
+
+/**
+ * Normaliza um valor que a API pode serializar como número ou string decimal
+ * ("5.08"). Ausência/valor não numérico vira `null` — NUNCA 0.
+ */
+export function toFiniteNumber(
+  value: number | string | null | undefined
+): number | null {
+  if (value === null || value === undefined) return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }

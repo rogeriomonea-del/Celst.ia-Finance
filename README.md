@@ -1,12 +1,14 @@
 # celest.ia Financeiro — Plataforma de Análise Financeira e Inteligência Multi-Agente
 
-> **⚠️ STATUS: INTEGRAÇÃO PARCIAL COM A API REAL.** As áreas **`/politica`
-> (Perfil e Política/IPS), `/importacao` (Importação B3), `/carteira` e
-> `/plano-aportes`** são conectadas à **API real** do backend do Investment
-> Intelligence OS (repositório `Celest.ia-v2-Alpha`, Fase 5) — elas não usam
-> nenhum dado simulado e exibem estado de erro explícito quando o backend
-> está fora do ar (`uvicorn investment_os.api.main:app`). As **demais áreas
-> antigas** (Dashboard, Agentes IA, Perfil, Rebalanceamento, Organizador)
+> **⚠️ STATUS: INTEGRAÇÃO PARCIAL COM A API REAL.** As áreas **`/visao-geral`
+> (Visão geral), `/tesouro` (Tesouro Direto), `/macro` (Regimes e séries),
+> `/politica` (Perfil e Política/IPS), `/importacao` (Importação B3),
+> `/carteira` e `/plano-aportes`** são conectadas à **API real** do backend do
+> Investment Intelligence OS (repositório `Celest.ia-v2-Alpha`, Fases 5 e 6) —
+> elas não usam nenhum dado simulado e exibem estado de erro explícito quando
+> o backend está fora do ar (`uvicorn investment_os.api.main:app`). As
+> **demais áreas antigas** (Dashboard, Agentes IA, Perfil, Rebalanceamento,
+> Organizador)
 > **continuam sendo protótipo com dados simulados** (base fundamentalista
 > embutida, curva patrimonial sintética, Open Finance simulado, cotações de
 > agregador) e estão marcadas com o selo "Simulado" — nenhum número dessas
@@ -19,10 +21,13 @@ Router) + TypeScript + Tailwind CSS**, com sistema multi-agente de IA para
 triagem fundamentalista de ações da B3, consolidação de carteira, perfil de
 investidor, rebalanceamento e organizador financeiro com Open Finance simulado.
 
-## Módulos conectados à API real (Fase 5)
+## Módulos conectados à API real (Fases 5 e 6)
 
 | Rota | Módulo | Descrição |
 |---|---|---|
+| `/visao-geral` | **Visão geral** | Painel inicial agregado: screener (contagens por status e aprovadas com P/L e P/VPA), Tesouro (referência IPCA+ 2050 vs threshold monitorado), regimes macro com confiança, carteira (snapshots + IPS) e saúde dos dados com destaque de staleness > 24h; blocos indisponíveis mostram motivo + comando para gerar |
+| `/tesouro` | **Tesouro Direto** | Curvas real (IPCA+) e nominal (prefixado) por vencimento, tabela completa de títulos (taxas, PU, duration modificada, DV01, percentil histórico; não modelado = badge com motivo, nunca número), radar de janelas por percentil com nota de não recomendação sempre visível e cenários MTM de ±50 a ±200 bps |
+| `/macro` | **Macro — regimes e séries** | Regimes por dimensão (estado, detalhe, confiança, data-base, fonte, natureza — expectativas de mercado destacadas), premissas e limites de escopo sempre visíveis, gráficos das séries oficiais do BCB (Selic meta, IPCA mensal, PTAX, dívida bruta/PIB) com data e unidade |
 | `/politica` | **Perfil e Política (IPS)** | Questionário adaptativo (scores por dimensão, conflitos, confiança), geração/edição de rascunhos da IPS em JSON, histórico de versões e confirmação explícita |
 | `/importacao` | **Importação B3** | Upload xlsx/csv (máx. 10 MB), prévia com contagens e remoção de PII, correção de linhas ambíguas/desconhecidas, confirmação com aceite de importação parcial |
 | `/carteira` | **Carteira** | Snapshot versionado: patrimônio precificado com nota de cobertura, pesos por classe/setor/moeda/país/emissor, posições com data do pregão, violações da IPS e qualidade dos dados |
@@ -30,7 +35,10 @@ investidor, rebalanceamento e organizador financeiro com Open Finance simulado.
 
 Esses módulos exigem o backend rodando (`uvicorn investment_os.api.main:app`
 no repo `Celest.ia-v2-Alpha`) e usam `NEXT_PUBLIC_IIOS_API_URL`
-(padrão `http://localhost:8000`).
+(padrão `http://localhost:8000`). As telas da Fase 6 dependem dos artefatos
+gold do backend (`python -m investment_os.cli build` para o screener e
+`python -m investment_os.cli macro` para Tesouro/macro) — quando ausentes, a
+UI mostra o motivo e o comando, nunca dados inventados.
 
 ## Módulos do protótipo (dados simulados — selo "Simulado")
 

@@ -54,6 +54,27 @@ ar = estado de erro com instrução de subir o backend); `null`/status nunca
 viram 0 (`indisponível`/`desconhecido`); preços com data do pregão;
 nota de cobertura do patrimônio e premissas do plano sempre visíveis.
 
+## Endpoints da Fase 6 (visão geral, macro, Tesouro Direto)
+
+Consumidos pelas telas `/visao-geral`, `/macro` e `/tesouro` via o mesmo
+cliente tipado `lib/api/investment-os.ts` (mesma base
+`NEXT_PUBLIC_IIOS_API_URL`; erros `{detail: {code, message}}`).
+
+| Endpoint | Conteúdo |
+|---|---|
+| `GET /v1/overview` | painel agregado: screener (contagens + aprovadas com P/L e P/VPA), Tesouro (data-base, nº títulos, janelas no radar, referência IPCA+ 2050 vs threshold monitorado), regimes macro com confiança, carteira (snapshots + IPS confirmada, sem valores) e saúde dos dados (mtime de cada gold + auditoria de ingestão). Cada bloco pode vir `{status: "indisponivel", motivo}` — a UI mostra o motivo e o comando que gera o artefato |
+| `GET /v1/macro/regimes` | regimes por dimensão (estado, detalhe, confiança `ALTA/MEDIA/BAIXA/INDISPONIVEL`, data-base, fonte, natureza), séries recentes (`selic_meta`, `ipca_mensal`, `ptax_venda`, `ibc_br`, `divida_bruta_pib`, `cdi_anual`, `igp_m`), premissas, fontes e itens fora do escopo; 404 `gold_missing` → rodar `python -m investment_os.cli macro` |
+| `GET /v1/macro/series/{serie_id}` | série individual `{serie_id, pontos: [{data, valor}], fonte}`; 404 `serie_not_found` |
+| `GET /v1/tesouro/titulos` | painel completo: títulos (taxas/PU compra e venda, `modelado`, duration Macaulay/modificada, DV01, convexidade, `motivo_nao_modelado`, histórico com percentil), curvas nominal prefixada e real IPCA+, radar de janelas por percentil (critério, saída por histerese, invalidação, nota de não recomendação), parâmetros do radar e `historico_oficial_desde` |
+| `GET /v1/tesouro/titulos/{tipo}/{vencimento}/cenarios` | cenários MTM de choques ±50/100/150/200 bps (PU novo, variação %, efeito duration/convexidade, resíduo) + risco do título; `tipo` contém espaços → sempre `encodeURIComponent`; 409 `nao_modelado` com motivo; 404 `gold_missing` → rodar `python -m investment_os.cli macro` |
+
+Regras adicionais dessas telas: bloco `indisponivel` nunca vira 0 nem some —
+mostra motivo + comando; título não modelado exibe badge com motivo, nunca
+número no lugar de duration/DV01; nota "não é recomendação" do radar sempre
+visível; rodapé do Tesouro deixa explícito que as taxas são as ofertadas ao
+varejo (Tesouro Transparente) e NÃO a curva indicativa ANBIMA; staleness de
+gold > 24h destacada na Visão geral.
+
 ## Plano de substituição (Fase 3+ do roadmap do backend)
 
 1. `lib/agents/market-data.ts` → `GET /v1/screener` / `GET /v1/assets/{ticker}`.

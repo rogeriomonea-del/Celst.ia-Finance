@@ -4,10 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Activity,
   Bot,
   Briefcase,
   CalendarClock,
   FileUp,
+  Gauge,
+  Landmark,
   LayoutDashboard,
   Menu,
   Scale,
@@ -30,6 +33,27 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  {
+    href: "/visao-geral",
+    label: "Visão geral",
+    description: "Screener · Tesouro · Macro · Saúde",
+    icon: Gauge,
+    tag: "api",
+  },
+  {
+    href: "/tesouro",
+    label: "Tesouro Direto",
+    description: "Curvas, radar e cenários MTM",
+    icon: Landmark,
+    tag: "api",
+  },
+  {
+    href: "/macro",
+    label: "Macro",
+    description: "Regimes e séries do BCB",
+    icon: Activity,
+    tag: "api",
+  },
   {
     href: "/politica",
     label: "Perfil e Política",
