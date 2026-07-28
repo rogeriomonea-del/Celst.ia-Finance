@@ -1,5 +1,14 @@
 # celest.ia Financeiro — Plataforma de Análise Financeira e Inteligência Multi-Agente
 
+> **⚠️ STATUS: PROTÓTIPO COM DADOS SIMULADOS.** Este app exibe dados
+> estáticos/heurísticos (base fundamentalista embutida, curva patrimonial
+> sintética, Open Finance simulado) e cotações de agregador. Ele está sendo
+> integrado ao backend de dados oficiais do Investment Intelligence OS
+> (repositório `Celest.ia-v2-Alpha`) — ver `docs/REPOSITORY_AUDIT.md` e
+> `docs/INTEGRATION.md`. Nenhum número exibido deve ser tratado como real
+> até essa integração.
+
+
 Plataforma web de análise de investimentos construída com **Next.js 14 (App
 Router) + TypeScript + Tailwind CSS**, com sistema multi-agente de IA para
 triagem fundamentalista de ações da B3, consolidação de carteira, perfil de
