@@ -44,7 +44,7 @@ function StatusIcon({ status }: { status: AgentStatus }) {
     case "error":
       return <XCircle className="h-4 w-4 text-loss" />;
     case "queued":
-      return <Circle className="h-4 w-4 animate-pulse-dot text-amber-400" />;
+      return <Circle className="h-4 w-4 animate-pulse-dot text-amber-600" />;
     default:
       return <Circle className="h-4 w-4 text-muted-foreground/40" />;
   }
@@ -73,8 +73,8 @@ export function AgentPipelineTracker({
             agent.status === "running"
               ? "border-primary/30 bg-primary/[0.06]"
               : agent.status === "done"
-                ? "border-white/10 bg-surface"
-                : "border-white/[0.06] bg-surface/50"
+                ? "border-border bg-surface"
+                : "border-border bg-surface/50"
           )}
         >
           <StatusIcon status={agent.status} />
@@ -128,8 +128,8 @@ export function AgentTerminal({
   }, [lines.length]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0c]">
-      <div className="flex items-center gap-2 border-b border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
+    <div className="overflow-hidden rounded-xl border border-border bg-[#0a0a0c]">
+      <div className="flex items-center gap-2 border-b border-border bg-slate-50 px-4 py-2.5">
         <TerminalSquare className="h-4 w-4 text-primary" />
         <span className="font-mono text-xs font-medium tracking-wide text-muted-foreground">
           TERMINAL DE OPERAÇÕES DE IA

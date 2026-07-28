@@ -116,7 +116,7 @@ export function EquityArea({ data }: EquityAreaProps) {
               strokeWidth={1.5}
               strokeDasharray="5 4"
               fill="transparent"
-              activeDot={{ r: 4, strokeWidth: 2, stroke: "#121214" }}
+              activeDot={{ r: 4, strokeWidth: 2, stroke: "#ffffff" }}
             />
             <Area
               type="monotone"
@@ -124,7 +124,7 @@ export function EquityArea({ data }: EquityAreaProps) {
               stroke={PROFIT_COLOR}
               strokeWidth={2}
               fill="url(#equityFill)"
-              activeDot={{ r: 4, strokeWidth: 2, stroke: "#121214" }}
+              activeDot={{ r: 4, strokeWidth: 2, stroke: "#ffffff" }}
             />
           </AreaChart>
         </ResponsiveContainer>

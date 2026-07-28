@@ -18,7 +18,7 @@ export function ChartTooltipFrame({
   footer?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-popover px-3 py-2.5 shadow-xl">
+    <div className="rounded-xl border border-border bg-popover px-3 py-2.5 shadow-xl">
       <p className="mb-1.5 text-xs font-medium text-muted-foreground">{title}</p>
       <div className="space-y-1">
         {rows.map((row) => (
@@ -38,7 +38,7 @@ export function ChartTooltipFrame({
         ))}
       </div>
       {footer && (
-        <div className="mt-1.5 border-t border-white/10 pt-1.5 text-xs text-muted-foreground">
+        <div className="mt-1.5 border-t border-border pt-1.5 text-xs text-muted-foreground">
           {footer}
         </div>
       )}
@@ -47,18 +47,18 @@ export function ChartTooltipFrame({
 }
 
 export const CHART_COLORS = [
-  "#3b82f6",
+  "#4f46e5",
   "#d97706",
-  "#8b5cf6",
+  "#7c3aed",
   "#0891b2",
-  "#f43f5e",
+  "#e11d48",
   "#059669",
 ] as const;
 
 export const CHART_GRID_COLOR = "rgba(255,255,255,0.06)";
-export const CHART_AXIS_COLOR = "#71717a";
-export const CHART_SURFACE = "#121214";
-export const PROFIT_COLOR = "#10b981";
+export const CHART_AXIS_COLOR = "#64748b";
+export const CHART_SURFACE = "#ffffff";
+export const PROFIT_COLOR = "#059669";
 export const PROFIT_SERIES_COLOR = "#059669";
-export const LOSS_COLOR = "#f43f5e";
-export const NEUTRAL_SERIES_COLOR = "#71717a";
+export const LOSS_COLOR = "#e11d48";
+export const NEUTRAL_SERIES_COLOR = "#64748b";

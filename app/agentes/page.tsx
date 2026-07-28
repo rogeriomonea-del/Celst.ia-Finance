@@ -241,14 +241,14 @@ export default function AgentesPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center rounded-xl border border-white/10 bg-surface p-1">
+          <div className="flex items-center rounded-xl border border-border bg-surface p-1">
             <button
               type="button"
               onClick={() => setScope("mercado")}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
                 scope === "mercado"
-                  ? "bg-white/10 text-foreground"
+                  ? "bg-slate-200 text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -261,7 +261,7 @@ export default function AgentesPage() {
               className={cn(
                 "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
                 scope === "carteira"
-                  ? "bg-white/10 text-foreground"
+                  ? "bg-slate-200 text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -322,12 +322,12 @@ export default function AgentesPage() {
               {AGENT_DEFINITIONS.map((definition) => (
                 <details
                   key={definition.id}
-                  className="group rounded-xl border border-white/[0.06] bg-surface/60"
+                  className="group rounded-xl border border-border bg-surface/60"
                 >
                   <summary className="cursor-pointer select-none px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground group-open:text-foreground">
                     {definition.name}
                   </summary>
-                  <pre className="scrollbar-thin max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-white/[0.06] px-4 py-3 font-mono text-[11.5px] leading-relaxed text-muted-foreground">
+                  <pre className="scrollbar-thin max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-border px-4 py-3 font-mono text-[11.5px] leading-relaxed text-muted-foreground">
                     {AGENT_PROMPTS[definition.id]}
                   </pre>
                 </details>
@@ -384,7 +384,7 @@ export default function AgentesPage() {
                     {pick.thesis}
                   </p>
 
-                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <div className="rounded-xl border border-border bg-slate-50 px-4 py-3">
                     <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Justificativa macroeconômica
                     </p>
