@@ -174,7 +174,8 @@ def _amostra(pontos: List[Dict[str, Any]], limite: int = LIMITE_PONTOS_DIARIOS) 
     """Reduz a série diária a no máximo ``limite`` pontos igualmente espaçados.
 
     O primeiro e o último dia entram sempre — são eles que ancoram o começo e o
-    fim da curva no gráfico.
+    fim da curva no gráfico. A exceção é ``limite == 1``, que não comporta os
+    dois: aí fica só o último ponto, o saldo final.
     """
     total = len(pontos)
     if limite <= 0 or total == 0:

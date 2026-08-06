@@ -245,6 +245,9 @@ def fetch_quotes(
         encontradas = _interpretar(_baixar(_url(lote, chave), chave, espera))
         if encontradas:
             cotacoes.update(encontradas)
+            # Um lote que responde prova que a rede está de pé: o disjuntor do
+            # resgate ticker a ticker volta a armar para os lotes seguintes.
+            falhas_seguidas = 0
             continue
         if len(lote) < 2 or falhas_seguidas >= _FALHAS_SEGUIDAS_MAX:
             continue

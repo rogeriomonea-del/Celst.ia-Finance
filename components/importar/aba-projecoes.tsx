@@ -70,7 +70,10 @@ function simular(
   meses: number
 ): ResultadoSimulado {
   const totalMeses = Math.max(0, Math.min(Math.round(meses), MAX_MESES));
-  const taxaMensal = taxaAnual <= -1 ? 0 : Math.pow(1 + taxaAnual, 1 / 12) - 1;
+  // Espelha engine/calc/simulador.py:taxa_mensal — uma taxa anual de -100% ou
+  // pior vira -100% ao mês (o capital some), em vez de raiz de número negativo.
+  const taxaMensal =
+    taxaAnual === 0 ? 0 : taxaAnual <= -1 ? -1 : Math.pow(1 + taxaAnual, 1 / 12) - 1;
   const serie: PontoSimulado[] = [
     { label: "Mês 0", month: 0, balance: inicial, invested: inicial, interest: 0 },
   ];

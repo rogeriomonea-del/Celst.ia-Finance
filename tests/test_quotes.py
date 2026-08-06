@@ -215,6 +215,36 @@ def test_resgate_individual_para_depois_de_tres_falhas(monkeypatch: pytest.Monke
     assert len(chamadas) == 6
 
 
+def test_lote_bem_sucedido_rearma_o_resgate_individual(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Um lote que responde prova que a rede voltou — o freio precisa soltar.
+
+    Sem o rearme, as 3 falhas do primeiro lote desligariam o resgate ticker a
+    ticker para sempre, e o terceiro lote (que só funciona individualmente)
+    voltaria vazio mesmo com a rede sabidamente de pé.
+    """
+    tickers = [f"AAA{indice:02d}" for indice in range(60)]
+    primeiro, segundo, terceiro = (set(tickers[:20]), set(tickers[20:40]), set(tickers[40:]))
+
+    def responder(url: str) -> Any:
+        lote = set(_tickers_da_url(url))
+        if lote <= primeiro:  # rede fora: lote e individuais falham
+            return urllib.error.URLError("sem rede")
+        if lote <= segundo:  # rede voltou
+            return _RespostaFalsa(_corpo(*[_ativo(t) for t in sorted(lote)]))
+        if len(lote) > 1:  # terceiro lote: só responde ticker a ticker
+            return urllib.error.HTTPError(url, 401, "MISSING_TOKEN", None, None)  # type: ignore[arg-type]
+        return _RespostaFalsa(_corpo(_ativo(sorted(lote)[0])))
+
+    _instalar(monkeypatch, responder)
+    cotacoes = fetch_quotes(tickers)
+
+    assert segundo <= set(cotacoes)
+    assert terceiro <= set(cotacoes)
+    assert not (set(cotacoes) & primeiro)
+
+
 # --------------------------------------------------------------------------
 # fetch_quotes — token
 # --------------------------------------------------------------------------
