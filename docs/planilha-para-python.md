@@ -262,5 +262,46 @@ motor foi construído em torno disso:
 - **Token fora do arquivo.** O `BRAPI_TOKEN` mora em variável de ambiente, não
   em uma célula da planilha como no tempo do VBA.
 
+## 6. Três defeitos da planilha que a conversão revelou
+
+Portar fórmula por fórmula obriga a explicar cada número — e três deles não se
+explicavam. Nos três casos o motor faz o certo; ficam registrados aqui porque a
+planilha original continua com eles.
+
+### 6.1 O KPI "Var. 12M ponderada" está congelado
+
+`Dashboard!N6` parece um indicador, mas é um **valor digitado**: 0,0336. Não há
+fórmula por trás. Ele foi calculado uma vez e nunca mais acompanhou os preços.
+Recalculando com os dados atuais — média ponderada pelo valor de mercado das
+classes listadas, entre os 64 ativos que têm o dado — o número é **0,03595**.
+
+O motor recalcula a cada análise, e o KPI diz de quantos ativos ele saiu.
+
+### 6.2 A banda de ETFs no rebalanceamento sempre manda vender
+
+A regra da aba é `alvo × 0,8` a `alvo × 1,2`. Em todas as classes, a coluna
+"Banda máx." tem `=E×1,2` — **menos na linha de ETFs**, onde `Rebalanceamento!G21`
+está vazia. A fórmula da ação continua lá:
+
+```excel
+=IF(D21<F21,"COMPRAR",IF(D21>G21,"VENDER","OK"))
+```
+
+Com `G21` vazia, o Excel a lê como zero, o teste vira `0,0325 > 0` e a resposta é
+**sempre VENDER** — qualquer que seja a alocação. Com a banda correta
+(2,4% a 3,6%) e o peso atual de 3,25%, a resposta certa é **OK**.
+
+O motor calcula a banda a partir do alvo, sem depender de célula preenchida.
+
+### 6.3 A aba Simulador ficou para trás do Config
+
+`Simulador!B4` (valor inicial) é digitado e não referencia `Config!B4`. Os dois
+divergiram: **R$ 2.400.000 na aba contra R$ 2.440.000 no Config** — R$ 61 mil de
+diferença no patrimônio projetado em 4 anos.
+
+Aqui não dá para adivinhar qual é o certo, então o motor **reproduz a aba** (o
+mesmo número que o Excel mostra) e emite um aviso visível na tela dizendo que os
+dois valores divergem. A escolha fica com quem conhece o dado.
+
 > Uso educacional. Não constitui recomendação de investimento nos termos da
 > Resolução CVM 20/2021.

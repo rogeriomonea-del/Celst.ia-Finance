@@ -39,6 +39,7 @@ from __future__ import annotations
 import io
 import time
 import zipfile
+from dataclasses import replace
 from datetime import date, datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar
 
@@ -229,6 +230,39 @@ def _atualizar_cotacoes(
 # --------------------------------------------------------------------------
 # Taxa anual usada por simulação e fluxo
 # --------------------------------------------------------------------------
+
+
+def _entradas_do_simulador(
+    inputs: WorkbookInputs,
+    assumptions: Assumptions,
+    taxa: float,
+    avisos: List[str],
+) -> Tuple[Assumptions, float, Optional[int]]:
+    """Faz a simulação usar as entradas da própria aba Simulador, quando existirem.
+
+    A aba é uma calculadora independente — valor inicial e aporte são digitados
+    ali e não referenciam o Config. Reproduzimos o que a planilha mostra, mas
+    avisamos quando os dois números divergem, porque isso costuma ser um valor
+    que ficou para trás e não uma escolha deliberada.
+    """
+    simulador = inputs.simulator
+    if simulador is None:
+        return assumptions, taxa, None
+
+    premissas = replace(
+        assumptions,
+        initial_capital=simulador.initial,
+        monthly_contribution=simulador.monthly,
+        monthly_withdrawal=0.0,  # o campo da aba já é líquido (aportes − retiradas)
+    )
+
+    if abs(simulador.initial - assumptions.initial_capital) > 0.005:
+        avisos.append(
+            f"A aba Simulador tem valor inicial próprio de {_moeda(simulador.initial)}, diferente do "
+            f"capital do Config ({_moeda(assumptions.initial_capital)}). A simulação segue a aba, como "
+            "no Excel; se o número certo é o do Config, atualize a célula da aba Simulador."
+        )
+    return premissas, simulador.annual_rate or taxa, simulador.months
 
 
 def _taxa_anual(
@@ -566,7 +600,14 @@ def analyze(
     simulation: Optional[SimulationResult] = None
     projection: Optional[ProjectionResult] = None
     if _ha_plano(assumptions):
-        simulation = _bloco("a simulação", avisos, lambda: compute_simulation(assumptions, taxa))
+        sim_premissas, sim_taxa, sim_meses = _entradas_do_simulador(
+            inputs, assumptions, taxa, avisos
+        )
+        simulation = _bloco(
+            "a simulação",
+            avisos,
+            lambda: compute_simulation(sim_premissas, sim_taxa, sim_meses),
+        )
         projection = _bloco("a projeção", avisos, lambda: compute_projection(assumptions))
     else:
         avisos.append(

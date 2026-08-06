@@ -160,6 +160,20 @@ class RebalanceTarget:
     target: float
 
 
+@dataclass(frozen=True)
+class SimulatorInputs:
+    """Entradas próprias da aba Simulador.
+
+    Ela é uma calculadora independente: o valor inicial e o aporte são digitados
+    ali e não referenciam o Config, então podem divergir dele com o tempo.
+    """
+
+    initial: float
+    monthly: float
+    annual_rate: Optional[float] = None
+    months: Optional[int] = None
+
+
 @dataclass
 class WorkbookInputs:
     """Tudo que foi extraído da pasta de trabalho, já tipado."""
@@ -174,6 +188,7 @@ class WorkbookInputs:
     inflation_forecast: List[Dict[str, float]] = field(default_factory=list)
     rebalance_targets: List[RebalanceTarget] = field(default_factory=list)
     assumptions: Assumptions = field(default_factory=Assumptions)
+    simulator: Optional[SimulatorInputs] = None
     usd_brl: float = 0.0
     opportunity_reserve: float = 0.0
     period_label: str = ""

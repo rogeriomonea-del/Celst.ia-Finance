@@ -18,6 +18,7 @@ from .models import (
     Provento,
     RebalanceTarget,
     ScenarioClass,
+    SimulatorInputs,
     WorkbookInputs,
 )
 from .workbook import SheetGrid, WorkbookData, as_number, normalize
@@ -472,6 +473,56 @@ def extract_scenarios(book: WorkbookData):
     return classes, probabilities, inflation
 
 
+def extract_simulator_inputs(book: WorkbookData) -> Optional[SimulatorInputs]:
+    """Lê as entradas digitadas na aba Simulador (valor inicial, aporte, taxa, prazo).
+
+    A taxa aceita "anual" ou "mensal" e o prazo aceita "ano(s)" ou "mes(es)",
+    seguindo o rótulo escrito na coluna ao lado — igual à planilha.
+    """
+    grid = book.sheet("Simulador", "Simulacao", "Simulação")
+    if grid is None:
+        return None
+
+    def linha(*rotulos: str) -> Optional[int]:
+        for rotulo in rotulos:
+            alvo = normalize(rotulo)
+            for row in range(1, min(grid.max_row, 30) + 1):
+                if normalize(grid.text(row, 1)).startswith(alvo):
+                    return row
+        return None
+
+    r_inicial = linha("valor inicial")
+    r_mensal = linha("valor mensal")
+    if r_inicial is None and r_mensal is None:
+        return None
+
+    inicial = grid.number(r_inicial, 2) if r_inicial else 0.0
+    mensal = grid.number(r_mensal, 2) if r_mensal else 0.0
+
+    taxa: Optional[float] = None
+    r_taxa = linha("taxa de juros")
+    if r_taxa:
+        bruta = grid.number(r_taxa, 2)
+        if bruta:
+            # A planilha guarda a taxa em pontos percentuais (ex.: 11,2 = 11,2%).
+            mensal_taxa = normalize(grid.text(r_taxa, 3)).startswith("mens")
+            taxa = bruta / 100.0
+            if mensal_taxa:
+                taxa = (1 + taxa) ** 12 - 1
+
+    meses: Optional[int] = None
+    r_prazo = linha("periodo", "período", "prazo")
+    if r_prazo:
+        prazo = grid.number(r_prazo, 2)
+        if prazo:
+            em_anos = normalize(grid.text(r_prazo, 3)).startswith("ano")
+            meses = int(round(prazo * 12)) if em_anos else int(round(prazo))
+
+    if not inicial and not mensal:
+        return None
+    return SimulatorInputs(initial=inicial, monthly=mensal, annual_rate=taxa, months=meses)
+
+
 def extract_rebalance_targets(book: WorkbookData) -> List[RebalanceTarget]:
     grid = book.sheet("Rebalanceamento", "Rebalance")
     if grid is None:
@@ -539,6 +590,7 @@ def extract_all(book: WorkbookData) -> WorkbookInputs:
         inflation_forecast=inflation,
         rebalance_targets=extract_rebalance_targets(book),
         assumptions=extract_assumptions(book),
+        simulator=extract_simulator_inputs(book),
         usd_brl=params["usd_brl"],
         opportunity_reserve=params["opportunity_reserve"],
         source_kind=kind,
