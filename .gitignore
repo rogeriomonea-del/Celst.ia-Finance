@@ -35,3 +35,10 @@ yarn-error.log*
 __pycache__/
 *.pyc
 .pytest_cache/
+.venv/
+
+# planilhas do usuário e saídas de verificação: contêm dados financeiros reais
+*.xlsm
+*.xlsx
+.playwright/
+analise*.json
