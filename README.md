@@ -10,6 +10,7 @@ investidor, rebalanceamento e organizador financeiro com Open Finance simulado.
 | Rota | Módulo | Descrição |
 |---|---|---|
 | `/` | **Dashboard** | Upload drag-and-drop de extratos (.csv/.xlsx/.json) com parser inteligente de colunas, carteira unificada com ganho/perda, cotações via brapi.dev, gráficos de alocação (donut), evolução patrimonial (área) e volatilidade (barras) |
+| `/importar` | **Importe suas Planilhas** | Sobe uma planilha do Excel (.xlsm/.xlsx) ou .csv e devolve a análise completa — carteira, proventos, rebalanceamento, cenários, simulador, projeção 2030, fluxo de caixa, patrimônio consolidado e 9 gráficos — calculada pelo motor Python em `engine/` |
 | `/agentes` | **Análise Multi-Agente** | Pipeline sequencial-paralelo com 5 agentes (Triagem Técnica ∥ Pesquisa de Contexto → Auditor de Filtros → Analista de DRE → Comitê de Investimento), terminal de operações com logs em tempo real e relatório final Top 5 |
 | `/perfil` | **Perfil do Investidor** | Questionário de suitability com 7 perguntas, score Conservador/Moderado/Arrojado e alocação recomendada por classe |
 | `/rebalanceamento` | **Rebalanceamento** | Porcentagens alvo por classe ou por ativo, cálculo de desvio e plano exato de COMPRAR/VENDER (valores e quantidades) |
@@ -21,6 +22,7 @@ investidor, rebalanceamento e organizador financeiro com Open Finance simulado.
 app/
 ├── layout.tsx                     # Shell com sidebar responsivo e tema dark
 ├── page.tsx                       # Dashboard
+├── importar/page.tsx              # Importe suas Planilhas (motor Python)
 ├── agentes/page.tsx               # Orquestrador multi-agente + terminal de IA
 ├── perfil/page.tsx                # Questionário de suitability
 ├── rebalanceamento/page.tsx       # Algoritmo de rebalanceamento
@@ -31,10 +33,21 @@ app/
 components/
 ├── ui/                            # Primitivas shadcn-style (Radix + CVA)
 ├── charts/                        # Recharts (donut, área, barras) com paleta validada p/ CVD
+├── importar/                      # Dropzone, KPIs e gráficos da análise da planilha
 ├── agent-terminal.tsx             # Terminal de operações + tracker do pipeline
 ├── file-dropzone.tsx              # Upload drag-and-drop
 ├── open-finance-modal.tsx         # Fluxo de consentimento simulado
 └── portfolio-table.tsx / stat-card.tsx / sidebar.tsx
+engine/                            # Motor Python 3.11 (stdlib + openpyxl; sem pandas/numpy)
+├── models.py                      # Dataclasses de entrada e saída — o contrato
+├── workbook.py                    # Leitura de .xlsm/.xlsx/.csv (único módulo com openpyxl)
+├── extract.py                     # Abas → tipos, guiado por cabeçalhos e não por endereços
+├── calc/                          # Módulos puros: posicao, proventos, rebalance, simulador,
+│                                  # projecao, cenarios, fluxo, consolidado, charts
+├── quotes.py                      # Cotações da brapi.dev em lote (substitui o macro VBA)
+├── pipeline.py                    # Orquestra os cálculos → Analysis serializável
+└── cli.py / server.py             # Uso local: terminal e servidor de desenvolvimento
+api/planilha.py                    # Função serverless (@vercel/python): POST /api/planilha
 lib/
 ├── agents/                        # engine.ts (motor analítico), actions.ts (Server Actions),
 │   │                              # prompts.ts, types.ts, market-data.ts (base fundamentalista)
@@ -59,6 +72,46 @@ consumindo a saída tipada dos anteriores:
 As execuções são expostas de duas formas: **Server Actions**
 (`lib/agents/actions.ts`, usadas pela UI) e **rotas de API estruturadas**
 (`POST /api/agents/{triagem|pesquisa|auditor|dre|comite}`).
+
+## Importe suas Planilhas — o motor Python
+
+A aba `/importar` recebe a planilha do usuário e devolve a análise pronta. Por
+trás dela está o pacote `engine/`, que substitui uma pasta de trabalho `.xlsm` de
+**17 abas, 28.430 fórmulas, 3 macros VBA e 9 gráficos** por Python puro.
+
+O que muda na prática:
+
+- **Sem Excel e sem macro.** O motor lê apenas os *valores* das células — nenhuma
+  fórmula do arquivo é reavaliada. Toda a lógica foi reescrita em `engine/calc/`.
+- **Sem AppleScript.** O macro `AtualizarCotacoes` só funcionava no macOS (via
+  `AppleScriptTask` e um `.scpt` instalado à mão no Terminal) e disparava **uma
+  requisição por ticker**. Virou `engine/quotes.py`: uma chamada HTTP **em lote**
+  à brapi.dev a cada 20 tickers, com `json.loads` de verdade e sem exceção em
+  caso de rede fora.
+- **Mais rápido.** Uma passada O(n) sobre os dados no lugar de um grafo de 28.430
+  fórmulas recalculadas em cascata, sem `OFFSET` volátil e sem os ~4.500
+  `IFERROR` de defesa.
+- **Privacidade.** O arquivo é processado **em memória** — não toca o disco, não é
+  gravado, não é logado e não é versionado (`*.xlsm`/`*.xlsx` estão no
+  `.gitignore`). Só os *tickers* saem para a brapi; valores e saldos, nunca.
+
+Rodando o motor localmente (Python 3.11):
+
+```bash
+pip install -r requirements.txt          # openpyxl==3.1.5, nada mais
+python3 -m engine.cli arquivo.xlsm       # análise completa em JSON no terminal
+python3 -m engine.server                 # http://127.0.0.1:8000 para o front-end
+python3 -m pytest tests/ -q              # fixtures sintéticas, sem dados reais
+```
+
+Com o servidor no ar, suba o Next.js apontado para ele —
+`NEXT_PUBLIC_ENGINE_URL=http://127.0.0.1:8000 npm run dev`. Em produção a
+variável fica vazia e as chamadas caem na função serverless `api/planilha.py`
+(`POST /api/planilha`, limite de 6 MB, `.xlsm`/`.xlsx`/`.csv`).
+
+Detalhes da conversão — mapa aba a aba, o destino de cada macro e de cada família
+de fórmula, e as garantias de privacidade — em
+[`docs/planilha-para-python.md`](docs/planilha-para-python.md).
 
 ## Como rodar
 

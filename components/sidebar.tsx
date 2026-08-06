@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bot,
+  FileSpreadsheet,
   LayoutDashboard,
   Menu,
   Scale,
@@ -29,6 +30,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Dashboard",
     description: "Carteira e indicadores",
     icon: LayoutDashboard,
+  },
+  {
+    href: "/importar",
+    label: "Importe suas Planilhas",
+    description: "Excel/CSV vira análise",
+    icon: FileSpreadsheet,
   },
   {
     href: "/agentes",
