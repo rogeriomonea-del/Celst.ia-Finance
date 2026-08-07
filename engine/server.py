@@ -43,7 +43,7 @@ import warnings
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import ModuleType
 from typing import Any, Dict, Optional, Sequence, Tuple
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 #: Porta padrão do servidor local.
 PORTA_PADRAO: int = 8787
@@ -54,6 +54,9 @@ HOST_PADRAO: str = "127.0.0.1"
 ROTAS_PLANILHA: Tuple[str, ...] = ("/planilha", "/api/planilha", "/api/py/planilha")
 #: Caminhos da sonda de saúde.
 ROTAS_SAUDE: Tuple[str, ...] = ("/health", "/api/health", "/api/py/health", "/")
+
+#: Prefixos delegados por inteiro para ``engine.extratos.api.tratar``.
+PREFIXOS_EXTRATOS: Tuple[str, ...] = ("/extratos", "/api/extratos", "/api/py/extratos")
 
 #: Hosts cuja origem é liberada no CORS quando o navegador manda ``Origin``.
 HOSTS_LOCAIS: Tuple[str, ...] = ("localhost", "127.0.0.1", "::1", "0.0.0.0")
@@ -97,7 +100,7 @@ def _cabecalhos_cors(origem: str) -> Dict[str, str]:
     resposta sai com ``*`` — aí não há navegador para proteger.
     """
     cabecalhos = {
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Access-Control-Max-Age": "86400",
         # Um cache intermediário não pode servir a resposta de uma origem a outra.
@@ -182,6 +185,59 @@ def criar_handler(api: ModuleType) -> type:
                 return b""
             return self.rfile.read(min(tamanho, api.LIMITE_BYTES * 2 + 4096)) or b""
 
+        # -- extratos ----------------------------------------------------
+        def _e_extratos(self) -> bool:
+            """A rota pertence ao módulo de extratos?"""
+            rota = _rota(self.path)
+            return any(
+                rota == prefixo or rota.startswith(prefixo + "/")
+                for prefixo in PREFIXOS_EXTRATOS
+            )
+
+        def _tratar_extratos(self) -> None:
+            """Delega todo ``/extratos*`` para ``engine.extratos.api.tratar``."""
+            from .extratos import api as extratos_api
+
+            try:
+                partes = urlsplit(self.path or "/")
+                params = parse_qs(partes.query or "")
+                corpo = b""
+                if self.command in ("POST", "PATCH", "PUT", "DELETE"):
+                    tamanho = self._tamanho_declarado()
+                    if tamanho > 0:
+                        corpo = (
+                            self.rfile.read(
+                                min(tamanho, extratos_api.limite_corpo_bytes())
+                            )
+                            or b""
+                        )
+                resposta = extratos_api.tratar(
+                    self.command, partes.path, params, corpo, dict(self.headers)
+                )
+            except Exception:  # noqa: BLE001 - o servidor nunca pode cair
+                self._responder(500, {"erro": "erro inesperado na API de extratos"})
+                return
+            status, payload, tipo = resposta[0], resposta[1], resposta[2]
+            extras: Dict[str, str] = resposta[3] if len(resposta) > 3 else {}
+            corpo_resposta = (
+                bytes(payload)
+                if isinstance(payload, (bytes, bytearray))
+                else extratos_api.corpo_json(payload)
+            )
+            self.send_response(status)
+            self.send_header("Content-Type", tipo)
+            self.send_header("Content-Length", str(len(corpo_resposta)))
+            self.send_header("Cache-Control", "no-store")
+            for chave, valor in extras.items():
+                self.send_header(chave, valor)
+            for chave, valor in _cabecalhos_cors(self._cabecalho("Origin")).items():
+                self.send_header(chave, valor)
+            self.end_headers()
+            try:
+                self.wfile.write(corpo_resposta)
+            except (BrokenPipeError, ConnectionResetError):  # cliente desistiu
+                pass
+
         # -- métodos HTTP ------------------------------------------------
         def do_OPTIONS(self) -> None:  # noqa: N802 - assinatura do BaseHTTPRequestHandler
             """Pré-voo CORS."""
@@ -192,6 +248,9 @@ def criar_handler(api: ModuleType) -> type:
             self.end_headers()
 
         def do_GET(self) -> None:  # noqa: N802
+            if self._e_extratos():
+                self._tratar_extratos()
+                return
             rota = _rota(self.path)
             if rota in ROTAS_SAUDE:
                 from .pipeline import VERSAO
@@ -215,6 +274,9 @@ def criar_handler(api: ModuleType) -> type:
             self._responder(404, {"error": f"Rota desconhecida: {rota}"})
 
         def do_POST(self) -> None:  # noqa: N802
+            if self._e_extratos():
+                self._tratar_extratos()
+                return
             rota = _rota(self.path)
             if rota not in ROTAS_PLANILHA:
                 self._responder(404, {"error": f"Rota desconhecida: {rota}"})
@@ -231,6 +293,18 @@ def criar_handler(api: ModuleType) -> type:
                 self._responder(status, payload)
             except Exception:  # noqa: BLE001 - o servidor nunca pode cair
                 self._responder(500, {"error": api.MSG_INESPERADO})
+
+        def do_PATCH(self) -> None:  # noqa: N802
+            if self._e_extratos():
+                self._tratar_extratos()
+                return
+            self._responder(404, {"error": f"Rota desconhecida: {_rota(self.path)}"})
+
+        def do_DELETE(self) -> None:  # noqa: N802
+            if self._e_extratos():
+                self._tratar_extratos()
+                return
+            self._responder(404, {"error": f"Rota desconhecida: {_rota(self.path)}"})
 
         def log_message(self, formato: str, *args: Any) -> None:  # noqa: A003
             """Log enxuto de uma linha por requisição (é um servidor de dev)."""
@@ -286,6 +360,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     base = f"http://{host}:{porta}"
     print(f"Motor Celestia ouvindo em {base}")
     print(f"  POST {base}/planilha   (multipart 'file' ou JSON 'file_base64')")
+    print(f"  *    {base}/extratos/* (API de extratos bancários e cartões)")
     print(f"  GET  {base}/health")
     print(f"  No Next.js: NEXT_PUBLIC_ENGINE_URL={base} npm run dev")
     print("  Ctrl+C para encerrar.")

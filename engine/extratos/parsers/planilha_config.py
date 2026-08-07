@@ -443,15 +443,21 @@ def _parse_dashboard(
                 pago_centavos = centavos
 
         competencia = f"{vence_em.year:04d}-{vence_em.month:02d}"
-        status = deriva_status_fatura(
-            Fatura(
-                cartao_id=0,
-                competencia=competencia,
-                vence_em=vence_em,
-                pago_centavos=pago_centavos,
-            ),
-            hoje,
-        )
+        if vence_em > hoje:
+            # Regra da própria planilha: SE(Data>HOJE;"A vencer";...) — a data
+            # vem ANTES do valor, então fatura futura fica "a vencer" (aberta)
+            # mesmo com pagamento registrado na coluna Valor.
+            status = "aberta"
+        else:
+            status = deriva_status_fatura(
+                Fatura(
+                    cartao_id=0,
+                    competencia=competencia,
+                    vence_em=vence_em,
+                    pago_centavos=pago_centavos,
+                ),
+                hoje,
+            )
         config.faturas.append(
             FaturaConfig(
                 cartao=nome_cartao,

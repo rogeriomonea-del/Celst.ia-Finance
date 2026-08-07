@@ -167,18 +167,23 @@ def _planeja(
         fecha_em = (
             date.fromisoformat(existente["fecha_em"]) if existente["fecha_em"] else None
         )
-        # O status respeita o valor total já conhecido no banco (se houver).
-        status_novo = deriva_status_fatura(
-            Fatura(
-                cartao_id=existente["cartao_id"],
-                competencia=existente["competencia"],
-                vence_em=fatura.vence_em,
-                fecha_em=fecha_em,
-                valor_centavos=existente["valor_centavos"],
-                pago_centavos=fatura.pago_centavos,
-            ),
-            hoje,
-        )
+        # O status respeita o valor total já conhecido no banco (se houver);
+        # sem valor conhecido vale a regra da planilha (parser) — mantém a
+        # reimportação idempotente para faturas futuras com pagamento anotado.
+        if existente["valor_centavos"] is None:
+            status_novo = fatura.status
+        else:
+            status_novo = deriva_status_fatura(
+                Fatura(
+                    cartao_id=existente["cartao_id"],
+                    competencia=existente["competencia"],
+                    vence_em=fatura.vence_em,
+                    fecha_em=fecha_em,
+                    valor_centavos=existente["valor_centavos"],
+                    pago_centavos=fatura.pago_centavos,
+                ),
+                hoje,
+            )
         diff = {}
         if int(existente["pago_centavos"] or 0) != fatura.pago_centavos:
             diff["pago_centavos"] = {
