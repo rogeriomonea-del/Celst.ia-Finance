@@ -58,35 +58,80 @@ Ele é idempotente — rodar de novo não quebra o que já existe.
 No fim ele imprime o **token da API**, necessário para as rotas do módulo de
 extratos. Guarde.
 
-### Endereços: não precisa comprar domínio
+### Endereços e DNS
 
-O VPS da Hostinger vem com **wildcard DNS** no hostname padrão — qualquer
-subdomínio de `srvNNNNNNN.hstgr.cloud` já aponta para a própria máquina. O
-instalador detecta o hostname e configura sozinho:
+A topologia configurada por padrão:
 
-| Aplicação | Endereço |
-|---|---|
-| celest.ia Finance | `https://financas.srvNNNNNNN.hstgr.cloud` |
-| celest.ia Flights | `https://voos.srvNNNNNNN.hstgr.cloud` |
+| Endereço | Serve | Acesso |
+|---|---|---|
+| `celestiaflights.com` (+ `www`) | celest.ia Flights | público |
+| `celestiaflights.cloud` (+ `www`) | redireciona 301 para o `.com` | público |
+| `financas.celestiaflights.com` | celest.ia Finance | **protegido por senha** |
 
-Para usar domínio próprio depois, é só apontar os registros `A`/`AAAA` no
-painel e reinstalar passando as variáveis:
+Um domínio só é o canônico (o `.com`); o `.cloud` redireciona. Isso protege a
+marca sem manter dois sites iguais no ar nem dividir o ranqueamento no Google.
+
+**Antes de instalar, aponte o DNS.** No painel do registrador, crie registros
+do tipo `A` para o IP do VPS (`82.112.244.246` no caso deste servidor):
+
+| Nome | Tipo | Valor |
+|---|---|---|
+| `@` (celestiaflights.com) | A | IP do VPS |
+| `www` | A | IP do VPS |
+| `financas` | A | IP do VPS |
+| `@` (celestiaflights.cloud) | A | IP do VPS |
+| `www` (no .cloud) | A | IP do VPS |
+
+Confira a propagação antes de seguir:
 
 ```bash
-DOMINIO_FINANCE=financas.seudominio.com.br \
-DOMINIO_FLIGHTS=voos.seudominio.com.br \
+dig +short celestiaflights.com          # tem que devolver o IP do VPS
+dig +short financas.celestiaflights.com
+```
+
+Para usar outros domínios, passe as variáveis:
+
+```bash
+DOMINIO_FLIGHTS=outrodominio.com \
+DOMINIO_ALIAS=outrodominio.net \
+DOMINIO_FINANCE=painel.outrodominio.com \
 bash /tmp/celestia/deploy/instalar.sh
 ```
 
+### Proteção do app financeiro
+
+O celest.ia Finance mostra patrimônio, extratos bancários e faturas. Num
+domínio público, qualquer um que descobrisse o endereço veria tudo — então ele
+fica atrás de **autenticação HTTP no nginx**. O instalador gera usuário e senha
+e grava em `/etc/celestia/senha-financas.txt` (0600, só root lê).
+
+Trocar a senha depois:
+
+```bash
+NOVA=$(head -c 18 /dev/urandom | base64 | tr -d '=+/' | cut -c1-20)
+printf 'rogerio:%s\n' "$(openssl passwd -apr1 "$NOVA")" > /etc/celestia/htpasswd
+chown root:www-data /etc/celestia/htpasswd && chmod 640 /etc/celestia/htpasswd
+printf 'usuario: rogerio\nsenha:   %s\n' "$NOVA" > /etc/celestia/senha-financas.txt
+systemctl reload nginx
+echo "nova senha: $NOVA"
+```
+
+O host de finanças também vai com `X-Robots-Tag: noindex`, e qualquer nome não
+reconhecido (inclusive o IP direto) recebe `444` e não serve nada — sem isso, um
+varredor de IP cairia no primeiro site configurado.
+
 ### HTTPS
+
+Só depois do DNS propagar:
 
 ```bash
 apt install -y certbot python3-certbot-nginx
-certbot --nginx -d financas.srvNNNNNNN.hstgr.cloud -d voos.srvNNNNNNN.hstgr.cloud
+certbot --nginx -d celestiaflights.com -d www.celestiaflights.com \
+        -d celestiaflights.cloud -d www.celestiaflights.cloud \
+        -d financas.celestiaflights.com
 ```
 
-O certbot ajusta os blocos do nginx e renova sozinho. Como o DNS já resolve, a
-validação passa de primeira.
+O certbot ajusta os blocos do nginx e renova sozinho.
 
 ### Capacidade
 

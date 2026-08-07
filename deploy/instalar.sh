@@ -10,13 +10,14 @@
 
 set -euo pipefail
 
-# VPS da Hostinger já vem com wildcard DNS no hostname padrão
-# (*.srv123456.hstgr.cloud aponta para a própria máquina), então os subdomínios
-# funcionam sem comprar domínio nem mexer em DNS. Detectamos o hostname e
-# montamos os subdomínios; passe as variáveis para usar um domínio próprio.
-HOSTNAME_VPS="$(hostname -f 2>/dev/null || hostname)"
-DOMINIO_FINANCE="${DOMINIO_FINANCE:-financas.$HOSTNAME_VPS}"
-DOMINIO_FLIGHTS="${DOMINIO_FLIGHTS:-voos.$HOSTNAME_VPS}"
+# Domínios. Os padrões abaixo são os do projeto; sobrescreva por variável para
+# usar outros. DOMINIO_ALIAS redireciona (301) para DOMINIO_FLIGHTS.
+DOMINIO_FLIGHTS="${DOMINIO_FLIGHTS:-celestiaflights.com}"
+DOMINIO_ALIAS="${DOMINIO_ALIAS:-celestiaflights.cloud}"
+DOMINIO_FINANCE="${DOMINIO_FINANCE:-financas.celestiaflights.com}"
+
+# Usuário do acesso protegido ao app financeiro (a senha é gerada aqui).
+USUARIO_FINANCE="${USUARIO_FINANCE:-rogerio}"
 REPO_FINANCE="${REPO_FINANCE:-https://github.com/rogeriomonea-del/Celst.ia-Finance.git}"
 REPO_FLIGHTS="${REPO_FLIGHTS:-https://github.com/rogeriomonea-del/Celest.ia-v2-Alpha.git}"
 BRANCH_FINANCE="${BRANCH_FINANCE:-main}"
@@ -36,7 +37,7 @@ erro() { printf '\n\033[1;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 log "instalando pacotes do sistema"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq curl git nginx python3 python3-pip python3-venv sqlite3 ca-certificates
+apt-get install -y -qq curl git nginx python3 python3-pip python3-venv openssl ca-certificates
 
 if ! command -v node >/dev/null || [ "$(node -v | sed 's/v\([0-9]*\).*/\1/')" -lt 18 ]; then
   log "instalando Node.js 22 LTS"
@@ -105,6 +106,21 @@ else
   log "$CONFIG/finance.env já existe — preservado"
 fi
 
+# Senha do app financeiro (autenticação HTTP no nginx). O app expõe patrimônio
+# e extratos: sem isso, qualquer um que descobrir o endereço veria tudo.
+if [ ! -f "$CONFIG/htpasswd" ]; then
+  SENHA_FINANCE="$(head -c 18 /dev/urandom | base64 | tr -d '=+/' | cut -c1-20)"
+  HASH="$(openssl passwd -apr1 "$SENHA_FINANCE")"
+  printf '%s:%s\n' "$USUARIO_FINANCE" "$HASH" > "$CONFIG/htpasswd"
+  chmod 640 "$CONFIG/htpasswd"
+  chown root:www-data "$CONFIG/htpasswd"
+  printf 'usuario: %s\nsenha:   %s\n' "$USUARIO_FINANCE" "$SENHA_FINANCE" > "$CONFIG/senha-financas.txt"
+  chmod 600 "$CONFIG/senha-financas.txt"
+  log "senha do app financeiro gerada em $CONFIG/senha-financas.txt"
+else
+  log "$CONFIG/htpasswd já existe — senha preservada"
+fi
+
 # --- 5. Dependências e build ------------------------------------------------
 log "instalando dependência do motor Python (openpyxl)"
 python3 -m pip install --quiet --upgrade openpyxl
@@ -134,11 +150,13 @@ log "configurando nginx"
 CONF=/etc/nginx/sites-available/celestia
 install -m 644 "$BASE/finance/deploy/nginx-celestia.conf" "$CONF"
 
-if [ -n "$DOMINIO_FINANCE" ]; then
-  sed -i "s/financas\.SEU_DOMINIO\.com\.br/$DOMINIO_FINANCE/" "$CONF"
-fi
-if [ -n "$DOMINIO_FLIGHTS" ]; then
-  sed -i "s/voos\.SEU_DOMINIO\.com\.br/$DOMINIO_FLIGHTS/" "$CONF"
+sed -i "s/DOMINIO_FLIGHTS/$DOMINIO_FLIGHTS/g; s/DOMINIO_ALIAS/$DOMINIO_ALIAS/g; s/DOMINIO_FINANCE/$DOMINIO_FINANCE/g" "$CONF"
+
+# Sem pilha IPv6 no host, `listen [::]:80` impede o nginx de subir. O VPS da
+# Hostinger tem IPv6, mas containers e algumas VMs não — então checamos.
+if [ ! -f /proc/net/if_inet6 ]; then
+  log "host sem IPv6 — removendo os listen [::] da configuração"
+  sed -i '/listen \[::\]/d' "$CONF"
 fi
 
 ln -sfn "$CONF" /etc/nginx/sites-enabled/celestia
@@ -164,13 +182,23 @@ echo ""
 echo "  Token da API (guarde):"
 grep CELESTIA_API_TOKEN "$CONFIG/finance.env"
 echo ""
-echo "  Já no ar (HTTP):"
-echo "   • Finanças: http://$DOMINIO_FINANCE"
-echo "   • Voos:     http://$DOMINIO_FLIGHTS"
+IP_VPS="$(curl -s -m 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')"
+echo "  Endereços configurados:"
+echo "   • Voos:     http://$DOMINIO_FLIGHTS  (e www)"
+echo "   • Alias:    http://$DOMINIO_ALIAS → redireciona para o .com"
+echo "   • Finanças: http://$DOMINIO_FINANCE  (protegido por senha)"
+echo ""
+echo "  Acesso ao app financeiro:"
+cat "$CONFIG/senha-financas.txt" | sed 's/^/   /'
 echo ""
 echo "  Próximos passos:"
-echo "   1. HTTPS:  apt install -y certbot python3-certbot-nginx"
-echo "      certbot --nginx -d $DOMINIO_FINANCE -d $DOMINIO_FLIGHTS"
+echo "   1. DNS — aponte no painel do registrador, tipo A, para $IP_VPS:"
+echo "        $DOMINIO_FLIGHTS · www · $DOMINIO_ALIAS · www · $DOMINIO_FINANCE"
+echo "      Confira com:  dig +short $DOMINIO_FLIGHTS"
+echo "   2. HTTPS (só depois do DNS propagar):"
+echo "      apt install -y certbot python3-certbot-nginx"
+echo "      certbot --nginx -d $DOMINIO_FLIGHTS -d www.$DOMINIO_FLIGHTS \\"
+echo "              -d $DOMINIO_ALIAS -d www.$DOMINIO_ALIAS -d $DOMINIO_FINANCE"
 echo "   2. Firewall:  ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw enable"
 echo "   3. Atualizações futuras:  sudo bash $BASE/finance/deploy/atualizar.sh"
 echo ""
