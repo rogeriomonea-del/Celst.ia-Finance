@@ -47,30 +47,53 @@ Conecte no VPS por SSH como root e rode:
 ```bash
 apt update && apt install -y git
 git clone https://github.com/rogeriomonea-del/Celst.ia-Finance.git /tmp/celestia
+bash /tmp/celestia/deploy/instalar.sh
+```
+
+Só isso. O script instala Node 22, Python e nginx; cria o usuário de serviço;
+clona os dois repositórios; gera o `finance.env` com um token aleatório;
+compila os dois sites; sobe os serviços; configura o nginx e agenda o backup.
+Ele é idempotente — rodar de novo não quebra o que já existe.
+
+No fim ele imprime o **token da API**, necessário para as rotas do módulo de
+extratos. Guarde.
+
+### Endereços: não precisa comprar domínio
+
+O VPS da Hostinger vem com **wildcard DNS** no hostname padrão — qualquer
+subdomínio de `srvNNNNNNN.hstgr.cloud` já aponta para a própria máquina. O
+instalador detecta o hostname e configura sozinho:
+
+| Aplicação | Endereço |
+|---|---|
+| celest.ia Finance | `https://financas.srvNNNNNNN.hstgr.cloud` |
+| celest.ia Flights | `https://voos.srvNNNNNNN.hstgr.cloud` |
+
+Para usar domínio próprio depois, é só apontar os registros `A`/`AAAA` no
+painel e reinstalar passando as variáveis:
+
+```bash
 DOMINIO_FINANCE=financas.seudominio.com.br \
 DOMINIO_FLIGHTS=voos.seudominio.com.br \
 bash /tmp/celestia/deploy/instalar.sh
 ```
 
-O script instala Node 22, Python, nginx e sqlite; cria o usuário de serviço;
-clona os dois repositórios; gera o `finance.env` com um token aleatório;
-compila os dois sites; sobe os serviços; configura o nginx e agenda o backup.
-Ele é idempotente — rodar de novo não quebra o que já existe.
-
-No fim ele imprime o **token da API**, que você vai precisar para as rotas do
-módulo de extratos. Guarde.
-
-### DNS e HTTPS
-
-No painel da Hostinger, aponte os registros `A` dos dois subdomínios para o IP
-do VPS. Depois, no servidor:
+### HTTPS
 
 ```bash
 apt install -y certbot python3-certbot-nginx
-certbot --nginx -d financas.seudominio.com.br -d voos.seudominio.com.br
+certbot --nginx -d financas.srvNNNNNNN.hstgr.cloud -d voos.srvNNNNNNN.hstgr.cloud
 ```
 
-O certbot ajusta os blocos do nginx e renova sozinho.
+O certbot ajusta os blocos do nginx e renova sozinho. Como o DNS já resolve, a
+validação passa de primeira.
+
+### Capacidade
+
+Um KVM 2 (2 vCPU, 8 GB) já roda os dois projetos com folga. Em planos maiores
+(KVM 8: 8 vCPU, 32 GB) sobra bastante margem — o gargalo do módulo de extratos
+é I/O de disco na importação, não CPU, e o SQLite em NVMe dá conta de anos de
+lançamentos com consultas em milissegundos.
 
 ## Atualizar
 

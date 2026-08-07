@@ -10,8 +10,13 @@
 
 set -euo pipefail
 
-DOMINIO_FINANCE="${DOMINIO_FINANCE:-}"
-DOMINIO_FLIGHTS="${DOMINIO_FLIGHTS:-}"
+# VPS da Hostinger já vem com wildcard DNS no hostname padrão
+# (*.srv123456.hstgr.cloud aponta para a própria máquina), então os subdomínios
+# funcionam sem comprar domínio nem mexer em DNS. Detectamos o hostname e
+# montamos os subdomínios; passe as variáveis para usar um domínio próprio.
+HOSTNAME_VPS="$(hostname -f 2>/dev/null || hostname)"
+DOMINIO_FINANCE="${DOMINIO_FINANCE:-financas.$HOSTNAME_VPS}"
+DOMINIO_FLIGHTS="${DOMINIO_FLIGHTS:-voos.$HOSTNAME_VPS}"
 REPO_FINANCE="${REPO_FINANCE:-https://github.com/rogeriomonea-del/Celst.ia-Finance.git}"
 REPO_FLIGHTS="${REPO_FLIGHTS:-https://github.com/rogeriomonea-del/Celest.ia-v2-Alpha.git}"
 BRANCH_FINANCE="${BRANCH_FINANCE:-main}"
@@ -159,12 +164,13 @@ echo ""
 echo "  Token da API (guarde):"
 grep CELESTIA_API_TOKEN "$CONFIG/finance.env"
 echo ""
+echo "  Já no ar (HTTP):"
+echo "   • Finanças: http://$DOMINIO_FINANCE"
+echo "   • Voos:     http://$DOMINIO_FLIGHTS"
+echo ""
 echo "  Próximos passos:"
-if [ -z "$DOMINIO_FINANCE" ]; then
-  echo "   1. Edite $CONF trocando SEU_DOMINIO pelos seus domínios e recarregue: nginx -t && systemctl reload nginx"
-else
-  echo "   1. Aponte o DNS de $DOMINIO_FINANCE (e do domínio de voos) para o IP deste servidor"
-fi
-echo "   2. Habilite HTTPS:  apt install -y certbot python3-certbot-nginx && certbot --nginx"
+echo "   1. HTTPS:  apt install -y certbot python3-certbot-nginx"
+echo "      certbot --nginx -d $DOMINIO_FINANCE -d $DOMINIO_FLIGHTS"
+echo "   2. Firewall:  ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw enable"
 echo "   3. Atualizações futuras:  sudo bash $BASE/finance/deploy/atualizar.sh"
 echo ""
