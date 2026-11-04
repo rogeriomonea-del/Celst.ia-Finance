@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/sidebar";
 import { AppStoreProvider } from "@/lib/store/app-store";
+import { UsuarioProvider } from "@/components/auth/usuario-provider";
+import { MolduraApp } from "@/components/auth/moldura-app";
 
 export const metadata: Metadata = {
   title: {
@@ -24,14 +25,11 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="dark">
       <body className="min-h-screen bg-background antialiased">
-        <AppStoreProvider>
-          <Sidebar />
-          <main className="min-h-screen pt-14 lg:pl-64 lg:pt-0">
-            <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
-              {children}
-            </div>
-          </main>
-        </AppStoreProvider>
+        <UsuarioProvider>
+          <AppStoreProvider>
+            <MolduraApp>{children}</MolduraApp>
+          </AppStoreProvider>
+        </UsuarioProvider>
       </body>
     </html>
   );

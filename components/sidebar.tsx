@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Bot,
   FileSpreadsheet,
+  Landmark,
   LayoutDashboard,
+  Loader2,
+  LogOut,
   Menu,
   Scale,
+  ShieldCheck,
   Sparkles,
   UserRound,
   Wallet,
@@ -16,6 +20,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useUsuario } from "@/components/auth/usuario-provider";
+import { AvatarUsuario } from "@/components/auth/avatar-usuario";
 
 interface NavItem {
   href: string;
@@ -36,6 +43,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Importe suas Planilhas",
     description: "Excel/CSV vira análise",
     icon: FileSpreadsheet,
+  },
+  {
+    href: "/extratos",
+    label: "Extratos & Cartões",
+    description: "Bancos, cartões e faturas",
+    icon: Landmark,
   },
   {
     href: "/agentes",
@@ -63,12 +76,22 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+/** Item visível só para administradores (aprova contas, vê sessões e acessos). */
+const ITEM_ADMIN: NavItem = {
+  href: "/admin",
+  label: "Administração",
+  description: "Contas, sessões e acessos",
+  icon: ShieldCheck,
+};
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { usuario } = useUsuario();
+  const itens = usuario?.admin ? [...NAV_ITEMS, ITEM_ADMIN] : NAV_ITEMS;
 
   return (
     <nav className="flex flex-1 flex-col gap-1 px-3">
-      {NAV_ITEMS.map((item) => {
+      {itens.map((item) => {
         const isActive =
           item.href === "/"
             ? pathname === "/"
@@ -121,6 +144,75 @@ function BrandMark() {
   );
 }
 
+/** Rodapé com avatar/iniciais, nome ou e-mail e botão "Sair". */
+function RodapeUsuario({ onNavigate }: { onNavigate?: () => void }) {
+  const router = useRouter();
+  const { usuario, carregando, sair } = useUsuario();
+  const [saindo, setSaindo] = useState(false);
+
+  const aoSair = async () => {
+    setSaindo(true);
+    try {
+      await sair();
+    } finally {
+      onNavigate?.();
+      router.replace("/entrar");
+    }
+  };
+
+  return (
+    <div className="border-t border-white/[0.06] px-4 py-4">
+      {carregando ? (
+        <div className="flex items-center gap-3 px-2">
+          <Skeleton className="h-9 w-9 rounded-full" />
+          <div className="flex-1 space-y-1.5">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-2.5 w-32" />
+          </div>
+        </div>
+      ) : usuario ? (
+        <div className="flex items-center gap-3 px-2">
+          <AvatarUsuario usuario={usuario} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium leading-tight" title={usuario.nome || usuario.email}>
+              {usuario.nome || usuario.email}
+            </p>
+            <p className="truncate text-[11px] leading-tight text-muted-foreground" title={usuario.email}>
+              {usuario.nome ? usuario.email : usuario.admin ? "Administrador" : "Conta ativa"}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Sair"
+            title="Sair"
+            onClick={() => void aoSair()}
+            disabled={saindo}
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            {saindo ? (
+              <Loader2 className="animate-spin" aria-hidden="true" />
+            ) : (
+              <LogOut aria-hidden="true" />
+            )}
+          </Button>
+        </div>
+      ) : (
+        <Button asChild variant="outline" size="sm" className="w-full">
+          <Link href="/entrar" onClick={onNavigate}>
+            Entrar
+          </Link>
+        </Button>
+      )}
+      <p className="mt-3 px-2 text-[11px] leading-relaxed text-muted-foreground/70">
+        v2.0 Alpha · Dados via brapi.dev
+        <br />
+        Uso educacional — não é recomendação.
+      </p>
+    </div>
+  );
+}
+
 export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -129,13 +221,7 @@ export function Sidebar() {
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-white/[0.06] bg-surface lg:flex">
         <BrandMark />
         <NavLinks />
-        <div className="border-t border-white/[0.06] px-6 py-4">
-          <p className="text-[11px] leading-relaxed text-muted-foreground/70">
-            v2.0 Alpha · Dados via brapi.dev
-            <br />
-            Uso educacional — não é recomendação.
-          </p>
-        </div>
+        <RodapeUsuario />
       </aside>
 
       <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-white/[0.06] bg-background/80 px-4 backdrop-blur lg:hidden">
@@ -164,6 +250,7 @@ export function Sidebar() {
           <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-white/[0.06] bg-surface pt-14 animate-fade-in">
             <BrandMark />
             <NavLinks onNavigate={() => setMobileOpen(false)} />
+            <RodapeUsuario onNavigate={() => setMobileOpen(false)} />
           </aside>
         </div>
       )}

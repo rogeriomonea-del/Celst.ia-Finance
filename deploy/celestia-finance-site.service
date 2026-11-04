@@ -1,0 +1,38 @@
+[Unit]
+Description=celest.ia Finance — site Next.js
+Documentation=https://github.com/rogeriomonea-del/Celst.ia-Finance
+After=network-online.target celestia-finance-motor.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=celestia
+Group=celestia
+WorkingDirectory=/opt/celestia/finance
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=-/etc/celestia/finance.env
+
+# `next start` serve o build de produção gerado por `npm run build`.
+ExecStart=/usr/bin/npm run start -- --port 3000 --hostname 127.0.0.1
+
+Restart=always
+RestartSec=3
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=celestia-site
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# O Next escreve cache de build em .next/cache durante a execução.
+ReadWritePaths=/opt/celestia/finance/.next
+ProtectKernelTunables=true
+ProtectKernelModules=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

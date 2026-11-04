@@ -1,0 +1,44 @@
+[Unit]
+Description=celest.ia Finance — motor Python (extratos, planilhas, cotações)
+Documentation=https://github.com/rogeriomonea-del/Celst.ia-Finance
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=celestia
+Group=celestia
+WorkingDirectory=/opt/celestia/finance
+
+# Segredos e configuração ficam num arquivo 0600 fora do repositório.
+EnvironmentFile=/etc/celestia/finance.env
+
+# Escuta só no loopback: quem fala com o mundo é o nginx.
+ExecStart=/usr/bin/python3 -m engine.server --host 127.0.0.1 --port 8787
+
+Restart=always
+RestartSec=3
+
+# Log no journal (journalctl -u celestia-finance-motor -f).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=celestia-motor
+
+# --- Blindagem do processo -------------------------------------------------
+# O motor só precisa ler o código e escrever no diretório de dados.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/celestia
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
