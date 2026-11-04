@@ -21,6 +21,8 @@ def dados_isolados(tmp_path, monkeypatch):
     monkeypatch.setenv("CELESTIA_COOKIE_DOMINIO", ".celestiaflights.com")
     monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
     monkeypatch.delenv("CELESTIA_SMTP_HOST", raising=False)
+    # A maioria dos testes quer contas prontas; a aprovação tem testes próprios.
+    monkeypatch.setenv("CELESTIA_CADASTRO_ABERTO", "1")
     yield
 
 
@@ -273,3 +275,143 @@ def test_acesso_fica_registrado_sem_expor_o_codigo():
     acoes = {evento["acao"] for evento in eventos}
     assert {"codigo_solicitado", "login_codigo"} <= acoes
     assert all(codigo not in (evento["detalhe"] or "") for evento in eventos)
+
+
+# --------------------------------------------------------------------------
+# Aprovação de contas e administração
+# --------------------------------------------------------------------------
+
+
+def _sessao(token: str) -> dict:
+    return {"cookie": f"{api.NOME_COOKIE}={token}"}
+
+
+def test_conta_nova_espera_aprovacao_quando_cadastro_fechado(monkeypatch):
+    monkeypatch.delenv("CELESTIA_CADASTRO_ABERTO", raising=False)
+    admin, _ = _login("primeiro@exemplo.com")  # primeiro entra direto e é admin
+    assert admin.admin
+
+    with store.conexao() as db:
+        codigo = contas.gerar_codigo(db, "segundo@exemplo.com")
+        with pytest.raises(contas.ErroAuth) as erro:
+            contas.verificar_codigo(db, "segundo@exemplo.com", codigo)
+        assert erro.value.status == 403 and "aprovar" in erro.value.mensagem
+        linha = db.execute("SELECT ativo, admin FROM usuarios WHERE email = 'segundo@exemplo.com'").fetchone()
+        assert linha["ativo"] == 0 and linha["admin"] == 0
+        acoes = [l["acao"] for l in db.execute("SELECT acao FROM eventos_acesso").fetchall()]
+        assert "conta_aguardando_aprovacao" in acoes
+
+
+def test_admin_aprova_conta_e_ela_passa_a_entrar(monkeypatch):
+    monkeypatch.delenv("CELESTIA_CADASTRO_ABERTO", raising=False)
+    admin, token_admin = _login("primeiro@exemplo.com")
+    with store.conexao() as db:
+        codigo = contas.gerar_codigo(db, "segundo@exemplo.com")
+        with pytest.raises(contas.ErroAuth):
+            contas.verificar_codigo(db, "segundo@exemplo.com", codigo)
+
+    status, corpo, _, _ = _chamar("GET", "/auth/admin/usuarios", cabecalhos=_sessao(token_admin))
+    assert status == 200
+    pendente = next(u for u in corpo["usuarios"] if u["email"] == "segundo@exemplo.com")
+    assert pendente["ativo"] is False
+
+    status, corpo, _, _ = _chamar(
+        "PATCH", f"/auth/admin/usuarios/{pendente['id']}",
+        corpo=json.dumps({"ativo": True}).encode(), cabecalhos=_sessao(token_admin),
+    )
+    assert status == 200 and corpo["usuario"]["ativo"] is True
+
+    segundo, _ = _login("segundo@exemplo.com")
+    assert segundo.admin is False
+
+
+def test_rotas_de_admin_exigem_admin():
+    _, token_admin = _login("primeiro@exemplo.com")
+    comum, token_comum = _login("segundo@exemplo.com")
+    assert _chamar("GET", "/auth/admin/usuarios")[0] == 401
+    assert _chamar("GET", "/auth/admin/usuarios", cabecalhos=_sessao(token_comum))[0] == 403
+    assert _chamar("GET", "/auth/admin/eventos", cabecalhos=_sessao(token_comum))[0] == 403
+    assert _chamar("GET", "/auth/admin/sessoes", cabecalhos=_sessao(token_admin))[0] == 200
+
+
+def test_admin_nao_se_rebaixa_nem_remove_o_ultimo_admin():
+    admin, token_admin = _login("primeiro@exemplo.com")
+    status, corpo, _, _ = _chamar(
+        "PATCH", f"/auth/admin/usuarios/{admin.id}",
+        corpo=json.dumps({"admin": False}).encode(), cabecalhos=_sessao(token_admin),
+    )
+    assert status == 409
+    status, _, _, _ = _chamar(
+        "PATCH", f"/auth/admin/usuarios/{admin.id}",
+        corpo=json.dumps({"ativo": False}).encode(), cabecalhos=_sessao(token_admin),
+    )
+    assert status == 409
+
+
+def test_admin_desativa_conta_e_derruba_sessoes():
+    admin, token_admin = _login("primeiro@exemplo.com")
+    comum, token_comum = _login("segundo@exemplo.com")
+    assert _chamar("GET", "/auth/eu", cabecalhos=_sessao(token_comum))[0] == 200
+
+    status, corpo, _, _ = _chamar(
+        "PATCH", f"/auth/admin/usuarios/{comum.id}",
+        corpo=json.dumps({"ativo": False}).encode(), cabecalhos=_sessao(token_admin),
+    )
+    assert status == 200 and corpo["usuario"]["ativo"] is False
+    assert _chamar("GET", "/auth/eu", cabecalhos=_sessao(token_comum))[0] == 401
+
+
+def test_admin_ve_sessoes_e_eventos_e_encerra_sessao():
+    admin, token_admin = _login("primeiro@exemplo.com")
+    comum, token_comum = _login("segundo@exemplo.com")
+
+    status, corpo, _, _ = _chamar(
+        "GET", "/auth/admin/sessoes", params={"usuario_id": str(comum.id)}, cabecalhos=_sessao(token_admin)
+    )
+    assert status == 200 and len(corpo["sessoes"]) == 1
+    sessao = corpo["sessoes"][0]
+    assert "token" not in sessao and "token_hash" not in sessao
+
+    status, corpo, _, _ = _chamar(
+        "DELETE", f"/auth/admin/sessoes/{sessao['id']}", cabecalhos=_sessao(token_admin)
+    )
+    assert status == 200
+    assert _chamar("GET", "/auth/eu", cabecalhos=_sessao(token_comum))[0] == 401
+
+    status, corpo, _, _ = _chamar("GET", "/auth/admin/eventos", cabecalhos=_sessao(token_admin))
+    assert status == 200
+    acoes = {e["acao"] for e in corpo["eventos"]}
+    assert "admin_encerrou_sessao" in acoes and "login_codigo" in acoes
+    assert all("codigo" not in str(e.get("detalhe") or "").lower() or "codigo_" in e["acao"] for e in corpo["eventos"])
+
+    # Derrubar todos os dispositivos de uma conta.
+    _, token_novo = _login("segundo@exemplo.com")
+    status, corpo, _, _ = _chamar(
+        "POST", f"/auth/admin/usuarios/{comum.id}/encerrar-sessoes", cabecalhos=_sessao(token_admin)
+    )
+    assert status == 200 and corpo["sessoes_encerradas"] >= 1
+    assert _chamar("GET", "/auth/eu", cabecalhos=_sessao(token_novo))[0] == 401
+
+
+# --------------------------------------------------------------------------
+# Destino pós-login (plataforma de voos no outro domínio)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "destino, esperado",
+    [
+        ("/extratos", "/extratos"),
+        ("", "/"),
+        ("//evil.com", "/"),
+        ("https://evil.com/", "/"),
+        ("https://celestiaflights.com/", "https://celestiaflights.com/"),
+        ("https://www.celestiaflights.com/voos", "https://www.celestiaflights.com/voos"),
+        ("https://celestiaflights.com.evil.com/", "/"),
+        ("http://celestiaflights.com/", "/"),  # sem TLS fora do localhost
+        ("http://localhost:5173/", "http://localhost:5173/"),
+        ("javascript:alert(1)", "/"),
+    ],
+)
+def test_destino_seguro(destino, esperado):
+    assert api.destino_seguro(destino) == esperado

@@ -20,6 +20,11 @@ Rotas:
     pt-BR, com 400/413/500. Também atende ``/api/planilha`` e ``/api/py/planilha``,
     para o caso de a variável de ambiente apontar para a raiz do servidor.
 
+``/extratos/*`` e ``/auth/*``
+    Delegados por inteiro para ``engine.extratos.api.tratar`` e
+    ``engine.auth.api.tratar`` (mesmo contrato de tupla; o 4º elemento vira
+    cabeçalhos extras — ``Set-Cookie``, ``Location``, ``Content-Disposition``).
+
 ``GET /health``
     Sonda de saúde: versão do motor, limite de upload e rotas disponíveis.
 
@@ -57,6 +62,8 @@ ROTAS_SAUDE: Tuple[str, ...] = ("/health", "/api/health", "/api/py/health", "/")
 
 #: Prefixos delegados por inteiro para ``engine.extratos.api.tratar``.
 PREFIXOS_EXTRATOS: Tuple[str, ...] = ("/extratos", "/api/extratos", "/api/py/extratos")
+#: Prefixos delegados por inteiro para ``engine.auth.api.tratar``.
+PREFIXOS_AUTH: Tuple[str, ...] = ("/auth", "/api/auth", "/api/py/auth")
 
 #: Hosts cuja origem é liberada no CORS quando o navegador manda ``Origin``.
 HOSTS_LOCAIS: Tuple[str, ...] = ("localhost", "127.0.0.1", "::1", "0.0.0.0")
@@ -185,14 +192,77 @@ def criar_handler(api: ModuleType) -> type:
                 return b""
             return self.rfile.read(min(tamanho, api.LIMITE_BYTES * 2 + 4096)) or b""
 
-        # -- extratos ----------------------------------------------------
+        # -- extratos e autenticação ------------------------------------
         def _e_extratos(self) -> bool:
             """A rota pertence ao módulo de extratos?"""
+            return self._tem_prefixo(PREFIXOS_EXTRATOS)
+
+        def _e_auth(self) -> bool:
+            """A rota pertence ao módulo de autenticação?"""
+            return self._tem_prefixo(PREFIXOS_AUTH)
+
+        def _tem_prefixo(self, prefixos: Tuple[str, ...]) -> bool:
             rota = _rota(self.path)
             return any(
-                rota == prefixo or rota.startswith(prefixo + "/")
-                for prefixo in PREFIXOS_EXTRATOS
+                rota == prefixo or rota.startswith(prefixo + "/") for prefixo in prefixos
             )
+
+        def _tratar_delegado(self) -> bool:
+            """Despacha ``/extratos*`` e ``/auth*``; devolve ``False`` se não era deles."""
+            if self._e_extratos():
+                self._tratar_extratos()
+                return True
+            if self._e_auth():
+                self._tratar_auth()
+                return True
+            return False
+
+        def _tratar_auth(self) -> None:
+            """Delega todo ``/auth*`` para ``engine.auth.api.tratar``.
+
+            As respostas de autenticação carregam ``Set-Cookie`` e, no fluxo do
+            Google, ``Location`` (302): o 4º elemento da tupla vira cabeçalho.
+            """
+            from .auth import api as auth_api
+            from .extratos import api as extratos_api
+
+            try:
+                partes = urlsplit(self.path or "/")
+                params = {
+                    chave: valores[0] if len(valores) == 1 else valores
+                    for chave, valores in parse_qs(partes.query or "").items()
+                }
+                corpo = b""
+                if self.command in ("POST", "PATCH", "PUT", "DELETE"):
+                    tamanho = self._tamanho_declarado()
+                    if tamanho > 0:
+                        corpo = self.rfile.read(min(tamanho, 64 * 1024)) or b""
+                resposta = auth_api.tratar(
+                    self.command, partes.path, params, corpo, dict(self.headers)
+                )
+            except Exception:  # noqa: BLE001 - o servidor nunca pode cair
+                self._responder(500, {"erro": "erro inesperado na autenticação"})
+                return
+            status, payload, tipo = resposta[0], resposta[1], resposta[2]
+            extras: Dict[str, str] = resposta[3] if len(resposta) > 3 else {}
+            corpo_resposta = (
+                bytes(payload)
+                if isinstance(payload, (bytes, bytearray))
+                else extratos_api.corpo_json(payload)
+            )
+            self.send_response(status)
+            self.send_header("Content-Type", tipo)
+            self.send_header("Content-Length", str(len(corpo_resposta)))
+            self.send_header("Cache-Control", "no-store")
+            for chave, valor in extras.items():
+                self.send_header(chave, valor)
+            for chave, valor in _cabecalhos_cors(self._cabecalho("Origin")).items():
+                self.send_header(chave, valor)
+            self.end_headers()
+            try:
+                self.wfile.write(corpo_resposta)
+            except (BrokenPipeError, ConnectionResetError):  # cliente desistiu
+                pass
 
         def _tratar_extratos(self) -> None:
             """Delega todo ``/extratos*`` para ``engine.extratos.api.tratar``."""
@@ -248,8 +318,7 @@ def criar_handler(api: ModuleType) -> type:
             self.end_headers()
 
         def do_GET(self) -> None:  # noqa: N802
-            if self._e_extratos():
-                self._tratar_extratos()
+            if self._tratar_delegado():
                 return
             rota = _rota(self.path)
             if rota in ROTAS_SAUDE:
@@ -261,7 +330,12 @@ def criar_handler(api: ModuleType) -> type:
                         "status": "ok",
                         "engine": VERSAO,
                         "limite_mb": api.LIMITE_MB,
-                        "rotas": {"analise": list(ROTAS_PLANILHA), "saude": list(ROTAS_SAUDE)},
+                        "rotas": {
+                            "analise": list(ROTAS_PLANILHA),
+                            "saude": list(ROTAS_SAUDE),
+                            "extratos": list(PREFIXOS_EXTRATOS),
+                            "auth": list(PREFIXOS_AUTH),
+                        },
                     },
                 )
                 return
@@ -274,8 +348,7 @@ def criar_handler(api: ModuleType) -> type:
             self._responder(404, {"error": f"Rota desconhecida: {rota}"})
 
         def do_POST(self) -> None:  # noqa: N802
-            if self._e_extratos():
-                self._tratar_extratos()
+            if self._tratar_delegado():
                 return
             rota = _rota(self.path)
             if rota not in ROTAS_PLANILHA:
@@ -295,14 +368,12 @@ def criar_handler(api: ModuleType) -> type:
                 self._responder(500, {"error": api.MSG_INESPERADO})
 
         def do_PATCH(self) -> None:  # noqa: N802
-            if self._e_extratos():
-                self._tratar_extratos()
+            if self._tratar_delegado():
                 return
             self._responder(404, {"error": f"Rota desconhecida: {_rota(self.path)}"})
 
         def do_DELETE(self) -> None:  # noqa: N802
-            if self._e_extratos():
-                self._tratar_extratos()
+            if self._tratar_delegado():
                 return
             self._responder(404, {"error": f"Rota desconhecida: {_rota(self.path)}"})
 
@@ -361,6 +432,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"Motor Celestia ouvindo em {base}")
     print(f"  POST {base}/planilha   (multipart 'file' ou JSON 'file_base64')")
     print(f"  *    {base}/extratos/* (API de extratos bancários e cartões)")
+    print(f"  *    {base}/auth/*     (login por e-mail/Google, sessões)")
     print(f"  GET  {base}/health")
     print(f"  No Next.js: NEXT_PUBLIC_ENGINE_URL={base} npm run dev")
     print("  Ctrl+C para encerrar.")

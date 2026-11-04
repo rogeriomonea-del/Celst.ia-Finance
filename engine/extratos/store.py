@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import sqlite3
 from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -239,8 +240,39 @@ def diretorio_dados() -> Path:
     return caminho
 
 
+#: Espaço de dados ativo na requisição atual (``None`` = raiz global).
+#: É um ``ContextVar``: cada thread do servidor enxerga só o seu valor, então
+#: duas requisições simultâneas de usuários diferentes nunca se misturam.
+_ESPACO_ATIVO: "ContextVar[Optional[Path]]" = ContextVar("celestia_espaco_ativo", default=None)
+
+
+def espaco_dados() -> Path:
+    """Raiz do espaço de dados ATIVO: o do usuário logado ou a raiz global.
+
+    O módulo de autenticação (``engine.auth``) ativa o espaço do usuário com
+    :func:`usar_espaco` antes de despachar a requisição; ``extratos.db`` e a
+    pasta ``originais`` passam a morar lá dentro. Fora de uma requisição
+    autenticada (testes, scripts, API aberta em dev) vale a raiz global.
+    """
+    ativo = _ESPACO_ATIVO.get()
+    if ativo is not None:
+        ativo.mkdir(parents=True, exist_ok=True)
+        return ativo
+    return diretorio_dados()
+
+
+@contextmanager
+def usar_espaco(caminho: Optional[Path]) -> Iterator[None]:
+    """Ativa ``caminho`` como espaço de dados durante o bloco (``None`` = global)."""
+    marcador = _ESPACO_ATIVO.set(caminho)
+    try:
+        yield
+    finally:
+        _ESPACO_ATIVO.reset(marcador)
+
+
 def caminho_banco() -> Path:
-    return diretorio_dados() / "extratos.db"
+    return espaco_dados() / "extratos.db"
 
 
 def _configura(db: sqlite3.Connection) -> None:

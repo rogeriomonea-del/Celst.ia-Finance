@@ -6,6 +6,24 @@
     "api/planilha.py": {
       "memory": 1024,
       "maxDuration": 30
+    },
+    "api/extratos.py": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/auth.py": {
+      "memory": 512,
+      "maxDuration": 15
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/extratos/:path*",
+      "destination": "/api/extratos"
+    },
+    {
+      "source": "/api/auth/:path*",
+      "destination": "/api/auth"
+    }
+  ]
 }

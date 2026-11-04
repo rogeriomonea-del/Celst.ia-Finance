@@ -17,13 +17,13 @@ import re
 from pathlib import Path
 from typing import Optional, Tuple
 
-from .store import diretorio_dados
+from .store import espaco_dados
 
 _EXTENSAO_SEGURA = re.compile(r"^[a-z0-9]{1,8}$")
 
 
 def _raiz() -> Path:
-    raiz = diretorio_dados() / "originais"
+    raiz = espaco_dados() / "originais"
     raiz.mkdir(parents=True, exist_ok=True)
     return raiz
 
@@ -68,7 +68,7 @@ def gravar(conteudo: bytes, nome_original: str) -> Tuple[str, str]:
             os.chmod(destino, 0o444)
         except OSError:
             pass
-    return digest, str(destino.relative_to(diretorio_dados()))
+    return digest, str(destino.relative_to(espaco_dados()))
 
 
 def ler(caminho_relativo: str) -> Optional[bytes]:
@@ -76,7 +76,7 @@ def ler(caminho_relativo: str) -> Optional[bytes]:
 
     Recusa qualquer caminho que escape da raiz de dados (path traversal).
     """
-    base = diretorio_dados().resolve()
+    base = espaco_dados().resolve()
     alvo = (base / caminho_relativo).resolve()
     if base not in alvo.parents:
         return None

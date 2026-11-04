@@ -15,9 +15,15 @@ e pela função serverless (``api/extratos.py``):
 
 Segurança:
 
-* ``CELESTIA_API_TOKEN`` definido → TODAS as rotas exigem
-  ``Authorization: Bearer <token>`` (comparação em tempo constante); sem o
-  token correto a resposta é 401.
+* Acesso e isolamento por conta (ver :func:`contexto_de_acesso`): com uma
+  sessão válida (cookie ``celestia_sessao`` ou ``Authorization: Bearer
+  <token de sessão>``) a requisição inteira roda no espaço de dados DAQUELE
+  usuário — ``usuarios/<id>/extratos.db`` e ``usuarios/<id>/originais`` —,
+  então uma conta não enxerga nem por acidente os dados de outra.
+  ``CELESTIA_API_TOKEN`` (comparação em tempo constante) continua valendo
+  para acesso de máquina e usa a raiz global. Sem nenhum dos dois a resposta
+  é 401 com ``{"erro": ..., "login": true}`` — exceto quando
+  ``CELESTIA_AUTH_ABERTO=1`` (só para desenvolvimento/testes).
 * Limite de upload ``CELESTIA_MAX_UPLOAD_MB`` (padrão 15) → 413.
 * Ids são sempre ``int(...)`` validados (400 quando inválidos); caminhos de
   arquivo derivam do sha256 no storage — nunca do caminho da URL (sem path
@@ -75,8 +81,8 @@ MSG_SEM_STORAGE = (
     " CELESTIA_DATA_DURAVEL=1. As leituras continuam funcionando."
 )
 MSG_NAO_AUTORIZADO = (
-    "não autorizado: envie o cabeçalho 'Authorization: Bearer <token>'"
-    " com o valor de CELESTIA_API_TOKEN"
+    "faça login para acessar seus extratos (ou envie 'Authorization: Bearer'"
+    " com uma sessão válida ou com o valor de CELESTIA_API_TOKEN)"
 )
 MSG_SEM_ARQUIVO = (
     'nenhum arquivo recebido — envie multipart/form-data com o campo "file"'
@@ -232,17 +238,63 @@ def _json_do_corpo(corpo: bytes) -> Tuple[Optional[Dict[str, Any]], Optional[str
     return dados, None
 
 
-def _token_ok(cabecalhos: Dict[str, str]) -> bool:
-    """Sem ``CELESTIA_API_TOKEN`` a API é aberta (dev local); com ele, todas as
-    rotas exigem Bearer correto — comparação em tempo constante."""
+def _token_de_maquina_ok(cabecalhos: Dict[str, str]) -> bool:
+    """``Authorization: Bearer`` igual a ``CELESTIA_API_TOKEN``? (tempo constante)
+
+    Sem a variável definida nunca é verdadeiro: o acesso de máquina é opt-in.
+    """
     esperado = os.environ.get("CELESTIA_API_TOKEN", "")
     if not esperado:
-        return True
+        return False
     bruto = cabecalhos.get("authorization", "")
     esquema, _, credencial = bruto.partition(" ")
     if esquema.strip().lower() != "bearer":
         return False
     return hmac.compare_digest(credencial.strip().encode("utf-8"), esperado.encode("utf-8"))
+
+
+def _auth_aberta() -> bool:
+    """``CELESTIA_AUTH_ABERTO=1`` libera a API sem login (dev/testes, raiz global)."""
+    return os.environ.get("CELESTIA_AUTH_ABERTO", "").strip() == "1"
+
+
+class Acesso:
+    """Quem está pedindo e em qual espaço de dados a requisição roda.
+
+    ``espaco`` é ``None`` para a raiz global (acesso de máquina ou API aberta)
+    e o diretório exclusivo da conta quando há usuário logado.
+    """
+
+    __slots__ = ("usuario", "espaco", "modo")
+
+    def __init__(self, usuario: Any = None, espaco: Any = None, modo: str = "aberto") -> None:
+        self.usuario = usuario
+        self.espaco = espaco
+        self.modo = modo
+
+
+def contexto_de_acesso(cabecalhos: Dict[str, str]) -> Optional[Acesso]:
+    """Resolve o acesso da requisição; ``None`` significa 401.
+
+    Ordem: sessão de usuário (cookie ou Bearer com token de sessão) →
+    espaço da conta; ``CELESTIA_API_TOKEN`` → raiz global, modo ``maquina``;
+    ``CELESTIA_AUTH_ABERTO=1`` → raiz global, modo ``aberto``.
+    """
+    from ..auth import api as auth_api
+    from ..auth.store import espaco_do_usuario
+
+    usuario = None
+    try:
+        usuario = auth_api.usuario_do_pedido(cabecalhos)
+    except Exception:  # noqa: BLE001 - banco de auth indisponível não derruba a API
+        usuario = None
+    if usuario is not None:
+        return Acesso(usuario=usuario, espaco=espaco_do_usuario(usuario.id), modo="sessao")
+    if _token_de_maquina_ok(cabecalhos):
+        return Acesso(modo="maquina")
+    if _auth_aberta():
+        return Acesso(modo="aberto")
+    return None
 
 
 def _serverless_sem_duravel() -> bool:
@@ -1298,8 +1350,9 @@ def tratar(
     if not segmentos or segmentos[0] != "extratos":
         return _erro(404, f"rota desconhecida: {caminho_limpo}")
 
-    if not _token_ok(cabecalhos_baixos):
-        return _erro(401, MSG_NAO_AUTORIZADO)
+    acesso = contexto_de_acesso(cabecalhos_baixos)
+    if acesso is None:
+        return 401, {"erro": MSG_NAO_AUTORIZADO, "login": True}, TIPO_JSON
     if metodo not in ("GET", "POST", "PATCH", "DELETE"):
         return _erro(405, f"método {metodo or '?'} não suportado")
     if len(corpo) > limite_corpo_bytes():
@@ -1312,7 +1365,8 @@ def tratar(
         return 503, {"erro": MSG_SEM_STORAGE}, TIPO_JSON
 
     try:
-        with store.conexao() as db:
+        # Tudo (banco + originais) dentro do espaço de quem pediu.
+        with store.usar_espaco(acesso.espaco), store.conexao() as db:
             return _despachar(
                 db, metodo, segmentos[1:], params, corpo, cabecalhos_baixos
             )

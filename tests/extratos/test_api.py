@@ -23,6 +23,8 @@ def ambiente(tmp_path, monkeypatch):
     """Dados isolados em tmp_path e ambiente limpo (sem token, sem Vercel)."""
     monkeypatch.setenv("CELESTIA_DATA_DIR", str(tmp_path))
     monkeypatch.delenv("CELESTIA_API_TOKEN", raising=False)
+    # Estes testes exercitam as rotas, não o login: API aberta (raiz global).
+    monkeypatch.setenv("CELESTIA_AUTH_ABERTO", "1")
     monkeypatch.delenv("VERCEL", raising=False)
     monkeypatch.delenv("CELESTIA_DATA_DURAVEL", raising=False)
     monkeypatch.delenv("CELESTIA_MAX_UPLOAD_MB", raising=False)
@@ -173,11 +175,21 @@ def test_fluxo_completo_da_api(ambiente):
 
 
 # --------------------------------------------------------------------------
-# Token: com CELESTIA_API_TOKEN, TODAS as rotas exigem Bearer
+# Acesso: sessão de usuário, token de máquina ou API aberta — senão 401
 # --------------------------------------------------------------------------
 
 
+def test_fechada_por_padrao_sem_sessao_nem_token(ambiente, monkeypatch):
+    monkeypatch.delenv("CELESTIA_AUTH_ABERTO", raising=False)
+    status, resposta = chama_json("GET", "/extratos/transacoes")
+    assert status == 401
+    assert resposta["login"] is True and "login" in resposta["erro"]
+    status, _ = chama_json("POST", "/extratos/lotes/1/confirmar")
+    assert status == 401
+
+
 def test_token_exigido_quando_configurado(ambiente, monkeypatch):
+    monkeypatch.delenv("CELESTIA_AUTH_ABERTO", raising=False)
     monkeypatch.setenv("CELESTIA_API_TOKEN", "segredo-sintetico")
 
     status, resposta = chama_json("GET", "/extratos/transacoes")
@@ -207,6 +219,69 @@ def test_token_exigido_quando_configurado(ambiente, monkeypatch):
 def test_sem_token_configurado_api_aberta(ambiente):
     status, _ = chama_json("GET", "/extratos/transacoes")
     assert status == 200
+
+
+def test_sessao_de_usuario_roda_no_espaco_da_conta(ambiente, monkeypatch):
+    """Cada conta logada enxerga SÓ o seu banco e os seus originais."""
+    monkeypatch.delenv("CELESTIA_AUTH_ABERTO", raising=False)
+    from engine.auth import api as auth_api
+    from engine.auth import contas, store as auth_store
+
+    monkeypatch.setenv("CELESTIA_CADASTRO_ABERTO", "1")
+    sessoes = {}
+    with auth_store.conexao() as db:
+        for email in ("ana@exemplo.com", "bia@exemplo.com"):
+            codigo = contas.gerar_codigo(db, email)
+            usuario = contas.verificar_codigo(db, email, codigo)
+            token, _ = contas.criar_sessao(db, usuario.id)
+            sessoes[email] = (usuario, token)
+
+    def cabecalho(email):
+        return {"Cookie": f"{auth_api.NOME_COOKIE}={sessoes[email][1]}"}
+
+    # Ana importa um extrato.
+    corpo, cab = multipart(
+        {"tipo_documento": "extrato_conta", "instituicao": "Banco Ana", "conta": "1"},
+        ("ana.csv", CSV_FELIZ),
+    )
+    cab.update(cabecalho("ana@exemplo.com"))
+    resposta = chama("POST", "/extratos/arquivos", corpo=corpo, cabecalhos=cab)
+    status, previa = resposta[0], resposta[1]
+    assert status in (200, 201), previa
+    lote = previa["lote_id"]
+    status, _ = chama_json(
+        "POST", f"/extratos/lotes/{lote}/confirmar", cabecalhos=cabecalho("ana@exemplo.com")
+    )
+    assert status == 200
+
+    status, lista_ana = chama_json("GET", "/extratos/transacoes", cabecalhos=cabecalho("ana@exemplo.com"))
+    assert status == 200 and len(lista_ana["itens"]) == 3
+
+    # Bia não vê nada — nem transações, nem instituições, nem arquivos.
+    status, lista_bia = chama_json("GET", "/extratos/transacoes", cabecalhos=cabecalho("bia@exemplo.com"))
+    assert status == 200 and lista_bia["itens"] == []
+    status, arquivos_bia = chama_json("GET", "/extratos/arquivos", cabecalhos=cabecalho("bia@exemplo.com"))
+    assert status == 200 and arquivos_bia.get("itens", arquivos_bia.get("arquivos", [])) == []
+
+    # O isolamento é físico: banco e originais dentro de usuarios/<id>/.
+    espaco_ana = auth_store.espaco_do_usuario(sessoes["ana@exemplo.com"][0].id)
+    assert (espaco_ana / "extratos.db").exists()
+    assert any((espaco_ana / "originais").rglob("*")), "original deveria estar no espaço da Ana"
+    # ...e nada vazou para a raiz global.
+    assert not (ambiente / "originais").exists()
+
+    # Bearer com o token de sessão também vale (clientes sem cookie).
+    status, lista = chama_json(
+        "GET", "/extratos/transacoes",
+        cabecalhos={"Authorization": f"Bearer {sessoes['ana@exemplo.com'][1]}"},
+    )
+    assert status == 200 and len(lista["itens"]) == 3
+
+    # Sessão encerrada → 401 na hora.
+    with auth_store.conexao() as db:
+        contas.encerrar_sessao(db, sessoes["ana@exemplo.com"][1])
+    status, _ = chama_json("GET", "/extratos/transacoes", cabecalhos=cabecalho("ana@exemplo.com"))
+    assert status == 401
 
 
 # --------------------------------------------------------------------------
