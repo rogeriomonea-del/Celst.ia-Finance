@@ -561,3 +561,12 @@ def test_upload_duplicado_responde_409(ambiente):
     assert repetido["erro_duplicado"] is True
     assert repetido["arquivo_id"] == previa["arquivo_id"]
     assert repetido["pode_reprocessar"] is True
+
+
+def test_lista_de_contas(ambiente):
+    status, previa = envia_csv()
+    assert status == 200
+    chama_json("POST", f"/extratos/lotes/{previa['lote_id']}/confirmar")
+    status, contas = chama_json("GET", "/extratos/contas")
+    assert status == 200 and isinstance(contas, list) and len(contas) == 1
+    assert contas[0]["nome"] == "Conta Corrente" and contas[0]["instituicao_nome"] == "Banco Teste"

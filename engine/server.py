@@ -255,7 +255,9 @@ def criar_handler(api: ModuleType) -> type:
             self.send_header("Content-Length", str(len(corpo_resposta)))
             self.send_header("Cache-Control", "no-store")
             for chave, valor in extras.items():
-                self.send_header(chave, valor)
+                # Lista = um cabeçalho por item (vários Set-Cookie na mesma resposta).
+                for item in (valor if isinstance(valor, (list, tuple)) else (valor,)):
+                    self.send_header(chave, str(item))
             for chave, valor in _cabecalhos_cors(self._cabecalho("Origin")).items():
                 self.send_header(chave, valor)
             self.end_headers()
@@ -299,7 +301,9 @@ def criar_handler(api: ModuleType) -> type:
             self.send_header("Content-Length", str(len(corpo_resposta)))
             self.send_header("Cache-Control", "no-store")
             for chave, valor in extras.items():
-                self.send_header(chave, valor)
+                # Lista = um cabeçalho por item (vários Set-Cookie na mesma resposta).
+                for item in (valor if isinstance(valor, (list, tuple)) else (valor,)):
+                    self.send_header(chave, str(item))
             for chave, valor in _cabecalhos_cors(self._cabecalho("Origin")).items():
                 self.send_header(chave, valor)
             self.end_headers()

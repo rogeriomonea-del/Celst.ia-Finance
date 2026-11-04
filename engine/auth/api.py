@@ -10,7 +10,7 @@ Rotas (prefixo ``/auth``):
 | POST | `/auth/codigo` | Pede um código de acesso por e-mail |
 | POST | `/auth/verificar` | Confere o código e abre a sessão |
 | GET  | `/auth/google` | Redireciona para o Google |
-| GET  | `/auth/google/retorno` | Retorno do Google; abre a sessão |
+| GET  | `/auth/google/retorno` | Retorno do Google; abre a sessão (erros viram 302 para `/entrar?erro=…`) |
 | GET  | `/auth/eu` | Quem está logado (ou 401) |
 | POST | `/auth/sair` | Encerra a sessão atual |
 | POST | `/auth/sair-de-tudo` | Encerra em todos os dispositivos |
@@ -44,6 +44,8 @@ from typing import Any, Dict, Optional, Tuple
 
 from . import contas, correio, google
 from .store import conexao, limpar_expirados, registra_evento
+from .store import hash_token as store_hash_token
+from .store import novo_token as store_novo_token
 
 NOME_COOKIE = "celestia_sessao"
 
@@ -126,10 +128,19 @@ def _json_do_corpo(corpo: bytes) -> Dict[str, Any]:
 
 
 def _ip(cabecalhos: Dict[str, str]) -> Optional[str]:
-    encaminhado = cabecalhos.get("x-forwarded-for") or cabecalhos.get("X-Forwarded-For")
-    if encaminhado:
-        return encaminhado.split(",")[0].strip()[:45]
-    return (cabecalhos.get("x-real-ip") or cabecalhos.get("X-Real-IP") or "").strip()[:45] or None
+    """IP do cliente para a trilha de auditoria.
+
+    ``X-Real-IP`` é definido pelo nginx a partir do ``$remote_addr`` e não pode
+    ser forjado pelo cliente. ``X-Forwarded-For`` é usado só na falta dele, e
+    pelo ÚLTIMO elemento: o nginx APENDA o endereço real ao que o cliente
+    mandou, então o primeiro elemento é o que o atacante quiser.
+    """
+    real = (cabecalhos.get("x-real-ip") or cabecalhos.get("X-Real-IP") or "").strip()
+    if real:
+        return real[:45]
+    encaminhado = cabecalhos.get("x-forwarded-for") or cabecalhos.get("X-Forwarded-For") or ""
+    partes = [parte.strip() for parte in encaminhado.split(",") if parte.strip()]
+    return partes[-1][:45] if partes else None
 
 
 def _erro(mensagem: str, status: int = 400) -> Resposta:
@@ -171,29 +182,45 @@ def destino_seguro(destino: Any) -> str:
 
     Aceita caminho interno (começa com ``/`` e não com ``//``) ou URL absoluta
     ``https://`` (``http://`` só para localhost) cujo host é um dos permitidos
-    ou subdomínio dele. Sem isso o parâmetro seria um redirecionamento aberto.
+    ou subdomínio dele. A URL devolvida é RECONSTRUÍDA das partes validadas
+    (esquema, host, porta, caminho, query) — nunca o texto bruto —, e barra
+    invertida, ``@``, espaço e caracteres de controle são recusados antes de
+    qualquer parse: navegadores tratam ``\\`` como ``/``, o que faria
+    ``https://evil.com\\@celestiaflights.com/`` parecer um host permitido.
     """
     texto = str(destino or "").strip()
-    if not texto:
+    if not texto or len(texto) > 2048:
         return "/"
-    if texto.startswith("/") and not texto.startswith("//") and not texto.startswith("/\\"):
-        return texto
+    if any(ch in texto for ch in ("\\", "@", " ")) or any(ord(ch) < 32 or ord(ch) == 127 for ch in texto):
+        return "/"
+    if texto.startswith("/"):
+        return texto if not texto.startswith("//") else "/"
     try:
         partes = urllib.parse.urlsplit(texto)
     except ValueError:
         return "/"
+    if partes.scheme not in ("http", "https") or not partes.netloc:
+        return "/"
     host = (partes.hostname or "").lower()
-    if not host or partes.scheme not in ("http", "https"):
+    if not host or partes.username is not None or partes.password is not None:
+        return "/"
+    try:
+        porta = partes.port
+    except ValueError:
         return "/"
     local = host in ("localhost", "127.0.0.1", "::1")
     if partes.scheme == "http" and not local:
         return "/"
-    if local:
-        return texto
-    for sufixo in hosts_permitidos():
-        if host == sufixo or host.endswith("." + sufixo):
-            return texto
-    return "/"
+    permitido = local or any(
+        host == sufixo or host.endswith("." + sufixo) for sufixo in hosts_permitidos()
+    )
+    if not permitido:
+        return "/"
+    netloc = f"[{host}]" if ":" in host else host
+    if porta is not None:
+        netloc += f":{porta}"
+    caminho = partes.path or "/"
+    return urllib.parse.urlunsplit((partes.scheme, netloc, caminho, partes.query, ""))
 
 
 # --------------------------------------------------------------------------
@@ -314,24 +341,84 @@ def _verificar(corpo: bytes, cabecalhos: Dict[str, str]) -> Resposta:
     )
 
 
+NOME_COOKIE_OAUTH = "celestia_oauth"
+VALIDADE_OAUTH_SEGUNDOS = 600
+
+
+def _cookie_oauth(valor: str, max_age: int) -> str:
+    """Cookie curto que amarra o ``state`` do Google ao navegador que começou.
+
+    Sem ele, um atacante poderia iniciar o fluxo, interceptar a própria URL de
+    retorno e entregá-la à vítima — que terminaria logada NA CONTA DO ATACANTE
+    (fixação de sessão). Com o cookie, o retorno só vale no navegador de origem.
+
+    Leva o mesmo ``Domain`` do cookie de sessão: o login pode começar na
+    plataforma de voos (``celestiaflights.com/api/py/auth/google``) e o
+    retorno do Google chega sempre no host de ``CELESTIA_URL_BASE``
+    (``financas.celestiaflights.com``) — sem o domínio compartilhado o cookie
+    não acompanharia e todo login iniciado em voos falharia.
+    """
+    partes = [f"{NOME_COOKIE_OAUTH}={valor}", "Path=/", "HttpOnly", "SameSite=Lax",
+              f"Max-Age={max_age}"]
+    if _seguro():
+        partes.append("Secure")
+    dominio = _dominio_cookie()
+    if dominio:
+        partes.append(f"Domain={dominio}")
+    return "; ".join(partes)
+
+
+def _nonce_do_pedido(cabecalhos: Dict[str, str]) -> Optional[str]:
+    bruto = cabecalhos.get("cookie") or cabecalhos.get("Cookie") or ""
+    for pedaco in bruto.split(";"):
+        nome, _, valor = pedaco.strip().partition("=")
+        if nome == NOME_COOKIE_OAUTH:
+            return urllib.parse.unquote(valor) or None
+    return None
+
+
+def _volta_para_login(codigo: str, cookies: Optional[list] = None) -> Resposta:
+    extras: Dict[str, str] = {"Location": f"/entrar?erro={codigo}"}
+    if cookies:
+        extras["Set-Cookie"] = cookies[0] if len(cookies) == 1 else cookies
+    return 302, b"", "text/plain", extras
+
+
 def _google_iniciar(params: Dict[str, Any]) -> Resposta:
     destino = destino_seguro(
         _parametro(params, "destino") or _parametro(params, "redirecionar_para") or "/"
     )
+    nonce = store_novo_token(24)
     with conexao() as db:
         limpar_expirados(db)
-        url = google.iniciar(db, destino)
-    return 302, b"", "text/plain", {"Location": url}
+        url = google.iniciar(db, destino, nonce_hash=store_hash_token(nonce))
+    return 302, b"", "text/plain", {
+        "Location": url,
+        "Set-Cookie": _cookie_oauth(nonce, VALIDADE_OAUTH_SEGUNDOS),
+    }
 
 
 def _google_retorno(params: Dict[str, Any], cabecalhos: Dict[str, str]) -> Resposta:
+    apaga_oauth = _cookie_oauth("", 0)
     if _parametro(params, "error"):
-        return 302, b"", "text/plain", {"Location": "/entrar?erro=google_cancelado"}
+        return _volta_para_login("google_cancelado", [apaga_oauth])
 
     with conexao() as db:
-        perfil, destino = google.concluir(
-            db, _parametro(params, "code"), _parametro(params, "state")
-        )
+        try:
+            perfil, destino = google.concluir(
+                db,
+                _parametro(params, "code"),
+                _parametro(params, "state"),
+                nonce=_nonce_do_pedido(cabecalhos),
+            )
+        except contas.ErroAuth as erro:
+            # Navegação de topo: nada de JSON cru. O motivo fica na auditoria
+            # (sem e-mail, sem code) e a tela de login explica em pt-BR.
+            with db:
+                registra_evento(db, "login_google_falhou", sucesso=False,
+                                detalhe=f"{erro.status}: {erro.mensagem[:120]}", ip=_ip(cabecalhos))
+            codigo = "google_expirado" if erro.status in (400, 401) else "google_falhou"
+            return _volta_para_login(codigo, [apaga_oauth])
         try:
             usuario = contas.obter_ou_criar_usuario(
                 db, perfil.email, nome=perfil.nome, avatar_url=perfil.avatar_url
@@ -340,7 +427,7 @@ def _google_retorno(params: Dict[str, Any], cabecalhos: Dict[str, str]) -> Respo
             # Conta aguardando aprovação (ou desativada): volta para a tela de
             # login com a explicação, em vez de uma página de erro crua.
             if erro.status == 403:
-                return 302, b"", "text/plain", {"Location": "/entrar?erro=conta_inativa"}
+                return _volta_para_login("conta_inativa", [apaga_oauth])
             raise
         contas.vincular_identidade(db, usuario.id, "google", perfil.sub, perfil.email)
         token, max_age = _abrir_sessao(db, usuario, cabecalhos)
@@ -352,7 +439,12 @@ def _google_retorno(params: Dict[str, Any], cabecalhos: Dict[str, str]) -> Respo
         302,
         b"",
         "text/plain",
-        {"Location": destino_seguro(destino), "Set-Cookie": _monta_cookie(token, max_age)},
+        {
+            "Location": destino_seguro(destino),
+            # Dois cookies na mesma resposta: o adaptador HTTP emite um
+            # Set-Cookie por item quando o valor é lista.
+            "Set-Cookie": [_monta_cookie(token, max_age), apaga_oauth],
+        },
     )
 
 

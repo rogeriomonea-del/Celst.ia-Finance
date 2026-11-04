@@ -36,6 +36,7 @@ export const BASE_EXTRATOS = "/api/py/extratos";
 
 const MENSAGENS_POR_STATUS: Record<number, string> = {
   400: "A requisição não foi aceita pelo motor. Confira os dados e tente de novo.",
+  401: "Sua sessão expirou ou você ainda não entrou. Entre de novo para continuar.",
   404: "O serviço de extratos não respondeu neste endereço. Se você está rodando localmente, suba o motor com python3 -m engine.server.",
   409: "Conflito: este arquivo já foi importado antes. Use reprocessar se quiser um novo lote.",
   413: "Arquivo grande demais para o limite configurado no servidor.",
@@ -77,6 +78,23 @@ function ehErroApi(corpo: unknown): corpo is ErroApi {
 function mensagemDeErro(corpo: unknown, status: number): string {
   if (ehErroApi(corpo)) return corpo.erro;
   return MENSAGENS_POR_STATUS[status] ?? MENSAGEM_PADRAO;
+}
+
+/** 401 do motor com `{login: true}`: não há sessão, precisa entrar. */
+function exigeLogin(corpo: unknown): boolean {
+  return (
+    typeof corpo === "object" &&
+    corpo !== null &&
+    (corpo as Record<string, unknown>).login === true
+  );
+}
+
+/** Manda o navegador para `/entrar?voltar=<rota atual>` (só no cliente). */
+function redirecionarParaEntrar(): void {
+  if (typeof window === "undefined") return;
+  const atual = window.location.pathname + window.location.search;
+  if (window.location.pathname === "/entrar") return;
+  window.location.assign("/entrar?voltar=" + encodeURIComponent(atual));
 }
 
 // --------------------------------------------------------------------------
@@ -133,6 +151,7 @@ async function requisitar<T>(
   try {
     resposta = await fetch(urlCom(caminho, opcoes?.params), {
       method: metodo,
+      credentials: "include",
       signal: opcoes?.signal,
       ...(opcoes?.formulario
         ? { body: opcoes.formulario }
@@ -150,6 +169,13 @@ async function requisitar<T>(
   }
 
   const corpo: unknown = await resposta.json().catch(() => null);
+  if (resposta.status === 401 && exigeLogin(corpo)) {
+    // Sem sessão: o motor pede login. Leva para /entrar guardando a rota
+    // atual para voltar depois. O erro ainda é lançado para quem chamou
+    // interromper o fluxo (a tela será trocada logo em seguida).
+    redirecionarParaEntrar();
+    throw new ErroApiExtratos(mensagemDeErro(corpo, resposta.status), resposta.status);
+  }
   if (!resposta.ok) {
     throw new ErroApiExtratos(mensagemDeErro(corpo, resposta.status), resposta.status);
   }

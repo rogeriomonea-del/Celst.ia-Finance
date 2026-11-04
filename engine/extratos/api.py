@@ -1278,6 +1278,16 @@ def _despachar(
         return _rotas_lotes(db, metodo, sobra, corpo)
     if recurso == "transacoes":
         return _rotas_transacoes(db, metodo, sobra, params, corpo)
+    if recurso == "contas":
+        if metodo == "GET" and not sobra:
+            linhas = db.execute(
+                "SELECT c.id, c.instituicao_id, c.nome, c.tipo, c.moeda, c.apelido, c.criada_em,"
+                " i.nome AS instituicao_nome FROM contas c"
+                " LEFT JOIN instituicoes i ON i.id = c.instituicao_id"
+                " ORDER BY i.nome, c.nome"
+            ).fetchall()
+            return _ok([dict(linha) for linha in linhas])
+        return _erro(404, "rota desconhecida em /extratos/contas (use GET)")
     if recurso == "categorias":
         return _rotas_categorias(db, metodo, sobra, corpo)
     if recurso == "regras":

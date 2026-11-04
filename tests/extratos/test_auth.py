@@ -415,3 +415,126 @@ def test_admin_ve_sessoes_e_eventos_e_encerra_sessao():
 )
 def test_destino_seguro(destino, esperado):
     assert api.destino_seguro(destino) == esperado
+
+
+@pytest.mark.parametrize(
+    "destino",
+    [
+        "https://evil.com\\@celestiaflights.com/",
+        "https://evil.com\\.celestiaflights.com/",
+        "https://user@celestiaflights.com/",
+        "https://celestiaflights.com evil/",
+        "https://celestiaflights.com/\r\nSet-Cookie: x=1",
+        "https://celestiaflights.com:abc/",
+    ],
+)
+def test_destino_seguro_recusa_truques_de_parse(destino):
+    assert api.destino_seguro(destino) == "/"
+
+
+def test_destino_seguro_reconstroi_a_url():
+    assert api.destino_seguro("https://celestiaflights.com/voos?x=1#frag") == "https://celestiaflights.com/voos?x=1"
+    assert api.destino_seguro("https://celestiaflights.com") == "https://celestiaflights.com/"
+
+
+def test_ip_de_auditoria_nao_e_forjavel():
+    assert api._ip({"x-real-ip": "10.0.0.9", "x-forwarded-for": "8.8.8.8, 10.0.0.9"}) == "10.0.0.9"
+    assert api._ip({"x-forwarded-for": "8.8.8.8, 10.0.0.9"}) == "10.0.0.9"
+    assert api._ip({}) is None
+
+
+def test_retorno_do_google_exige_o_navegador_que_iniciou(monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "cliente-teste")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "segredo-teste")
+    from engine.auth import google
+
+    status, _, _, cabecalhos = _chamar("GET", "/auth/google", params={"destino": "/extratos"})
+    assert status == 302
+    cookie = cabecalhos["Set-Cookie"]
+    assert cookie.startswith(f"{api.NOME_COOKIE_OAUTH}=") and "HttpOnly" in cookie
+    nonce = cookie.split(";")[0].split("=", 1)[1]
+    with store.conexao() as db:
+        estado = db.execute("SELECT estado FROM estados_oauth").fetchone()[0]
+
+    # URL de retorno roubada, usada noutro navegador (sem o cookie): recusada,
+    # e o state é queimado de qualquer jeito.
+    with store.conexao() as db:
+        with pytest.raises(contas.ErroAuth) as erro:
+            google._consumir_estado(db, estado, nonce="outro")
+        assert erro.value.status == 401
+        assert db.execute("SELECT COUNT(*) FROM estados_oauth").fetchone()[0] == 0
+
+    # Com o cookie certo passa.
+    status, _, _, cabecalhos = _chamar("GET", "/auth/google", params={"destino": "/extratos"})
+    nonce = cabecalhos["Set-Cookie"].split(";")[0].split("=", 1)[1]
+    with store.conexao() as db:
+        estado = db.execute("SELECT estado FROM estados_oauth").fetchone()[0]
+        assert google._consumir_estado(db, estado, nonce=nonce) == "/extratos"
+
+
+def test_erro_no_retorno_do_google_volta_para_a_tela_de_login(monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "cliente-teste")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "segredo-teste")
+    # state inexistente → navegação de topo recebe redirect, nunca JSON cru.
+    status, corpo, _, cabecalhos = _chamar(
+        "GET", "/auth/google/retorno", params={"code": "abc", "state": "inexistente"}
+    )
+    assert status == 302 and cabecalhos["Location"].startswith("/entrar?erro=google_")
+    assert corpo == b""
+    with store.conexao() as db:
+        evento = db.execute(
+            "SELECT acao, detalhe FROM eventos_acesso WHERE acao = 'login_google_falhou'"
+        ).fetchone()
+        assert evento is not None and "abc" not in (evento["detalhe"] or "")
+
+
+def test_primeiro_acesso_simultaneo_nao_quebra():
+    """Várias requisições ao mesmo tempo num extratos.db ainda inexistente."""
+    import threading
+    from engine.extratos import api as extratos_api
+
+    _, token = _login("rogerio@exemplo.com")
+    cabecalhos = {"cookie": f"{api.NOME_COOKIE}={token}"}
+    resultados = []
+
+    def chama():
+        resultados.append(extratos_api.tratar("GET", "/extratos/painel", {}, b"", cabecalhos)[0])
+
+    threads = [threading.Thread(target=chama) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert resultados == [200] * 8
+
+
+def test_migrar_dados_da_raiz_para_a_conta(tmp_path):
+    import io
+    from engine.auth import migrar_dados
+    from engine.extratos import store as extratos_store
+
+    raiz = extratos_store.diretorio_dados()
+    with extratos_store.conexao(raiz / "extratos.db") as db:
+        with db:
+            db.execute("INSERT INTO instituicoes (nome) VALUES ('Banco Antigo')")
+    (raiz / "originais" / "ab").mkdir(parents=True)
+    (raiz / "originais" / "ab" / "abc.csv").write_bytes(b"x")
+
+    assert migrar_dados.migrar("ninguem@exemplo.com", saida=io.StringIO()) == 2
+    usuario, _ = _login("rogerio@exemplo.com")
+
+    saida = io.StringIO()
+    assert migrar_dados.migrar("rogerio@exemplo.com", simular=True, saida=saida) == 0
+    assert (raiz / "extratos.db").exists() and "simulação" in saida.getvalue()
+
+    assert migrar_dados.migrar(str(usuario.id), saida=io.StringIO()) == 0
+    espaco = store.espaco_do_usuario(usuario.id)
+    assert not (raiz / "extratos.db").exists() and not (raiz / "originais").exists()
+    assert (espaco / "originais" / "ab" / "abc.csv").read_bytes() == b"x"
+    with extratos_store.conexao(espaco / "extratos.db") as db:
+        assert db.execute("SELECT nome FROM instituicoes").fetchone()[0] == "Banco Antigo"
+
+    # Segunda vez: espaço já ocupado → recusa sem tocar em nada.
+    with extratos_store.conexao(raiz / "extratos.db"):
+        pass
+    assert migrar_dados.migrar(str(usuario.id), saida=io.StringIO()) == 3

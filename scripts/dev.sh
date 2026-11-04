@@ -5,7 +5,14 @@
 #   PORTA_SITE=4000 ./scripts/dev.sh
 #
 # O motor Python guarda os dados em CELESTIA_DATA_DIR (padrão ~/.celestia-financeiro):
-# é lá que ficam o banco SQLite dos extratos e os arquivos originais importados.
+# é lá que ficam o banco SQLite dos extratos, os arquivos originais importados
+# e o banco de contas/sessões do login.
+#
+# Login em desenvolvimento: sem SMTP configurado, o código de acesso de 6
+# dígitos NÃO é enviado por e-mail — ele é impresso neste terminal, na linha
+# "SMTP não configurado — código de ...". O primeiro e-mail que entrar vira
+# administrador. Para testar o envio real, exporte CELESTIA_SMTP_* antes de
+# rodar (veja .env.example).
 # Ctrl+C derruba os dois processos.
 
 set -euo pipefail
@@ -16,6 +23,12 @@ cd "$RAIZ"
 PORTA_MOTOR="${PORTA_MOTOR:-8787}"
 PORTA_SITE="${PORTA_SITE:-3000}"
 export CELESTIA_DATA_DIR="${CELESTIA_DATA_DIR:-$HOME/.celestia-financeiro}"
+
+# Login: o cookie de sessão sai sem `Secure` (estamos em http://localhost) e os
+# redirecionamentos do login (inclusive o retorno do Google) apontam para o site
+# local. Em produção essas variáveis vêm de /etc/celestia/finance.env.
+export CELESTIA_URL_BASE="${CELESTIA_URL_BASE:-http://localhost:$PORTA_SITE}"
+export CELESTIA_COOKIE_INSEGURO="${CELESTIA_COOKIE_INSEGURO:-1}"
 
 echo "→ dados em: $CELESTIA_DATA_DIR"
 mkdir -p "$CELESTIA_DATA_DIR"
@@ -62,7 +75,14 @@ PID_SITE=$!
 
 echo ""
 echo "Pronto. Abra http://localhost:$PORTA_SITE"
+echo "  /entrar     login por código de e-mail (o primeiro e-mail vira admin)"
 echo "  /importar   analisa sua planilha de carteira (.xlsm/.xlsx/.csv)"
 echo "  /extratos   extratos bancários, cartões e faturas"
+echo "  /admin      aprovação de contas, sessões e acessos"
+if [ -z "${CELESTIA_SMTP_HOST:-}" ]; then
+  echo ""
+  echo "  Login sem SMTP: o código de 6 dígitos NÃO vai por e-mail — ele aparece"
+  echo "  AQUI no terminal, na linha do motor \"SMTP não configurado — código de ...\"."
+fi
 echo "Ctrl+C encerra os dois."
 wait

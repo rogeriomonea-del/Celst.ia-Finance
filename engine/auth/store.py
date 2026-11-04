@@ -24,6 +24,7 @@ import hashlib
 import os
 import secrets
 import sqlite3
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -31,7 +32,7 @@ from typing import Iterator, Optional
 
 from ..extratos.store import diretorio_dados
 
-VERSAO_SCHEMA = 1
+VERSAO_SCHEMA = 2
 
 _MIGRACOES = {
     1: """
@@ -94,7 +95,14 @@ _MIGRACOES = {
     );
     CREATE INDEX idx_eventos_email ON eventos_acesso(email, quando);
     """,
+    # Vínculo do state do Google com o navegador de origem (cookie celestia_oauth).
+    2: """
+    ALTER TABLE estados_oauth ADD COLUMN nonce_hash TEXT;
+    """,
 }
+
+
+_TRAVA_MIGRACAO = threading.Lock()
 
 
 def caminho_banco_auth() -> Path:
@@ -110,12 +118,14 @@ def conexao(caminho: Optional[Path] = None) -> Iterator[sqlite3.Connection]:
         db.execute("PRAGMA foreign_keys = ON")
         db.execute("PRAGMA journal_mode = WAL")
         db.execute("PRAGMA busy_timeout = 5000")
-        atual = db.execute("PRAGMA user_version").fetchone()[0]
-        for versao in sorted(_MIGRACOES):
-            if versao > atual:
-                with db:
-                    db.executescript(_MIGRACOES[versao])
-                    db.execute(f"PRAGMA user_version = {versao}")
+        if db.execute("PRAGMA user_version").fetchone()[0] < max(_MIGRACOES):
+            with _TRAVA_MIGRACAO:  # duas threads não criam o schema ao mesmo tempo
+                atual = db.execute("PRAGMA user_version").fetchone()[0]
+                for versao in sorted(_MIGRACOES):
+                    if versao > atual:
+                        with db:
+                            db.executescript(_MIGRACOES[versao])
+                            db.execute(f"PRAGMA user_version = {versao}")
         yield db
     finally:
         db.close()

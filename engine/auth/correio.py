@@ -105,8 +105,9 @@ def enviar_codigo(destino: str, codigo: str) -> Tuple[bool, str]:
                 smtp.login(usuario, senha)
                 smtp.send_message(_monta_mensagem(destino, codigo))
     except Exception as erro:  # noqa: BLE001 - qualquer falha de SMTP é a mesma para quem chama
-        # O tipo do erro ajuda a diagnosticar; o código jamais entra no log aqui.
-        log.error("falha ao enviar código para %s: %s", destino, type(erro).__name__)
+        # O tipo do erro ajuda a diagnosticar; nem o código nem o e-mail
+        # entram no log (o endereço do usuário não é dado de diagnóstico).
+        log.error("falha ao enviar código por SMTP: %s", type(erro).__name__)
         return False, "erro"
     return True, "email"
 

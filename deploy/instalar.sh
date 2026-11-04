@@ -16,8 +16,6 @@ DOMINIO_FLIGHTS="${DOMINIO_FLIGHTS:-celestiaflights.com}"
 DOMINIO_ALIAS="${DOMINIO_ALIAS:-celestiaflights.cloud}"
 DOMINIO_FINANCE="${DOMINIO_FINANCE:-financas.celestiaflights.com}"
 
-# Usuário do acesso protegido ao app financeiro (a senha é gerada aqui).
-USUARIO_FINANCE="${USUARIO_FINANCE:-rogerio}"
 REPO_FINANCE="${REPO_FINANCE:-https://github.com/rogeriomonea-del/Celst.ia-Finance.git}"
 REPO_FLIGHTS="${REPO_FLIGHTS:-https://github.com/rogeriomonea-del/Celest.ia-v2-Alpha.git}"
 BRANCH_FINANCE="${BRANCH_FINANCE:-main}"
@@ -31,13 +29,93 @@ CONFIG=/etc/celestia
 log() { printf '\n\033[1;36m→ %s\033[0m\n' "$*"; }
 erro() { printf '\n\033[1;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 
+# --- Variáveis de ambiente do login ------------------------------------------
+# (As duas funções abaixo são idênticas às do atualizar.sh — mantenha em sincronia.)
+
+# Domínio do cookie de sessão: só quando o app financeiro é SUBDOMÍNIO do
+# domínio de voos (financas.celestiaflights.com sob celestiaflights.com →
+# .celestiaflights.com, e a mesma sessão vale nos dois apps). Em qualquer
+# outro caso fica vazio e o cookie vale só no host do app financeiro — nunca
+# se tenta adivinhar o domínio por contagem de pontos: "minhaempresa.com.br"
+# viraria ".com.br" (sufixo público, o navegador descarta o cookie) e
+# "srv123.hstgr.cloud" viraria ".hstgr.cloud" (o token iria para qualquer VPS
+# de terceiros nesse sufixo).
+dominio_cookie() {
+  local finance="$1" flights="${2:-}"
+  if [ -n "$flights" ] && [ "$finance" != "$flights" ] && [ "${finance%.$flights}" != "$finance" ]; then
+    printf '.%s' "$flights"
+  fi
+}
+
+# Garante que uma variável exista no arquivo de ambiente, sem duplicar.
+#   garantir_variavel ARQUIVO 'NOME=valor' 'comentário 1' 'comentário 2'...
+#   garantir_variavel ARQUIVO '# NOME=' 'comentário'      # deixa desativada
+# Se NOME já aparece no arquivo (ativa ou comentada), nada muda — o valor que
+# o administrador escreveu é preservado. Se não aparece, acrescenta no fim,
+# precedida dos comentários.
+garantir_variavel() {
+  local arquivo="$1" definicao="$2" nome comentario
+  shift 2
+  nome="${definicao#\#}"
+  nome="${nome# }"
+  nome="${nome%%=*}"
+  if grep -Eq "^[[:space:]]*#?[[:space:]]*${nome}=" "$arquivo"; then
+    return 0
+  fi
+  {
+    echo ""
+    for comentario in "$@"; do echo "# $comentario"; done
+    echo "$definicao"
+  } >> "$arquivo"
+  echo "  + $nome"
+  VARIAVEIS_ADICIONADAS=$((${VARIAVEIS_ADICIONADAS:-0} + 1))
+}
+
+# Acrescenta ao finance.env as variáveis do login que ainda faltam.
+completar_env_login() {
+  local arquivo="$1" dominio="$2" flights="${3:-}" raiz cookie
+  cookie="$(dominio_cookie "$dominio" "$flights")"
+  # Caixa de e-mail de exemplo no domínio raiz (financas.x.com → x.com).
+  raiz="${cookie#.}"; raiz="${raiz:-$dominio}"
+  garantir_variavel "$arquivo" "CELESTIA_URL_BASE=https://$dominio" \
+    "--- Login e contas ---------------------------------------------------" \
+    "URL pública do app financeiro. Usada nos links e na URI de retorno do" \
+    "Google: {CELESTIA_URL_BASE}/api/py/auth/google/retorno"
+  garantir_variavel "$arquivo" "CELESTIA_COOKIE_DOMINIO=$cookie" \
+    "Domínio do cookie de sessão. Com o ponto na frente (.celestiaflights.com)" \
+    "a mesma sessão vale para o app financeiro e para a plataforma de voos." \
+    "Vazio = só o host do app financeiro."
+  garantir_variavel "$arquivo" "# CELESTIA_SMTP_HOST=smtp.hostinger.com" \
+    "SMTP para enviar o código de acesso por e-mail. Enquanto estiver vazio" \
+    "o código NÃO é enviado: aparece no log (journalctl -u celestia-finance-motor)."
+  garantir_variavel "$arquivo" "# CELESTIA_SMTP_PORT=465" \
+    "465 = SSL (Hostinger), 587 = STARTTLS."
+  garantir_variavel "$arquivo" "# CELESTIA_SMTP_USER=nao-responda@$raiz" \
+    "Caixa remetente (na Hostinger, um e-mail criado no painel do domínio)."
+  garantir_variavel "$arquivo" "# CELESTIA_SMTP_SENHA=" \
+    "Senha dessa caixa."
+  garantir_variavel "$arquivo" "# CELESTIA_SMTP_DE=" \
+    "Remetente exibido (opcional; padrão = o usuário acima)."
+  garantir_variavel "$arquivo" "CELESTIA_APP_NOME=celest.ia" \
+    "Nome que aparece no assunto e no corpo do e-mail."
+  garantir_variavel "$arquivo" "# GOOGLE_CLIENT_ID=" \
+    "Entrar com Google (opcional). Crie um cliente OAuth 2.0 'Aplicativo da Web'" \
+    "em console.cloud.google.com e cadastre EXATAMENTE a URI de retorno:" \
+    "https://$dominio/api/py/auth/google/retorno"
+  garantir_variavel "$arquivo" "# GOOGLE_CLIENT_SECRET=" \
+    "Segredo do cliente OAuth."
+  garantir_variavel "$arquivo" "# CELESTIA_CADASTRO_ABERTO=0" \
+    "1 = toda conta nova já entra ativa, sem aprovação do administrador." \
+    "Padrão 0: o primeiro login vira admin; os seguintes aguardam aprovação em /admin."
+}
+
 [ "$(id -u)" -eq 0 ] || erro "rode como root (sudo bash deploy/instalar.sh)"
 
 # --- 1. Pacotes -------------------------------------------------------------
 log "instalando pacotes do sistema"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq curl git nginx python3 python3-pip python3-venv openssl ca-certificates
+apt-get install -y -qq curl git nginx python3 python3-pip python3-venv ca-certificates
 
 if ! command -v node >/dev/null || [ "$(node -v | sed 's/v\([0-9]*\).*/\1/')" -lt 18 ]; then
   log "instalando Node.js 22 LTS"
@@ -88,7 +166,8 @@ CELESTIA_DATA_DIR=$DADOS/finance
 # Declara que o storage é durável (VPS tem disco real, ao contrário de serverless).
 CELESTIA_DATA_DURAVEL=1
 
-# Token exigido nas rotas do módulo de extratos (Authorization: Bearer ...).
+# Token para acesso de máquina às rotas de extratos (Authorization: Bearer ...).
+# No navegador o acesso é pela sessão de login, sem token.
 CELESTIA_API_TOKEN=$TOKEN
 
 # Tamanho máximo de upload em MB (o nginx também limita, em 20m).
@@ -103,22 +182,20 @@ EOF
   chmod 600 "$CONFIG/finance.env"
   chown root:root "$CONFIG/finance.env"
 else
-  log "$CONFIG/finance.env já existe — preservado"
+  log "$CONFIG/finance.env já existe — valores preservados"
 fi
 
-# Senha do app financeiro (autenticação HTTP no nginx). O app expõe patrimônio
-# e extratos: sem isso, qualquer um que descobrir o endereço veria tudo.
-if [ ! -f "$CONFIG/htpasswd" ]; then
-  SENHA_FINANCE="$(head -c 18 /dev/urandom | base64 | tr -d '=+/' | cut -c1-20)"
-  HASH="$(openssl passwd -apr1 "$SENHA_FINANCE")"
-  printf '%s:%s\n' "$USUARIO_FINANCE" "$HASH" > "$CONFIG/htpasswd"
-  chmod 640 "$CONFIG/htpasswd"
-  chown root:www-data "$CONFIG/htpasswd"
-  printf 'usuario: %s\nsenha:   %s\n' "$USUARIO_FINANCE" "$SENHA_FINANCE" > "$CONFIG/senha-financas.txt"
-  chmod 600 "$CONFIG/senha-financas.txt"
-  log "senha do app financeiro gerada em $CONFIG/senha-financas.txt"
-else
-  log "$CONFIG/htpasswd já existe — senha preservada"
+# Nas duas situações (arquivo novo ou antigo) acrescenta o que faltar para o
+# login — assim uma instalação anterior ganha as variáveis novas sem perder
+# as que já tinha.
+log "conferindo variáveis do login em $CONFIG/finance.env"
+completar_env_login "$CONFIG/finance.env" "$DOMINIO_FINANCE" "$DOMINIO_FLIGHTS"
+
+# A proteção do app financeiro agora é o login do próprio app (código por
+# e-mail ou Google, com aprovação de contas em /admin). O htpasswd de
+# instalações anteriores não é mais lido pelo nginx.
+if [ -f "$CONFIG/htpasswd" ] || [ -f "$CONFIG/senha-financas.txt" ]; then
+  log "aviso: $CONFIG/htpasswd e senha-financas.txt são de uma instalação anterior e NÃO são mais usados (o login é do app). Pode apagá-los."
 fi
 
 # --- 5. Dependências e build ------------------------------------------------
@@ -144,19 +221,40 @@ install -m 644 "$BASE/finance/deploy/celestia-finance-site.service" /etc/systemd
 systemctl daemon-reload
 systemctl enable --now celestia-finance-motor.service
 systemctl enable --now celestia-finance-site.service
+# Se já estavam no ar, recarrega com o finance.env possivelmente atualizado.
+systemctl restart celestia-finance-motor.service celestia-finance-site.service
 
 # --- 7. nginx ---------------------------------------------------------------
 log "configurando nginx"
 CONF=/etc/nginx/sites-available/celestia
-install -m 644 "$BASE/finance/deploy/nginx-celestia.conf" "$CONF"
+montar_conf_nginx() {
+  # Gera a configuração a partir do modelo, com os domínios e sem IPv6 se o
+  # host não tiver (sem isso `listen [::]:80` impede o nginx de subir).
+  local destino="$1"
+  install -m 644 "$BASE/finance/deploy/nginx-celestia.conf" "$destino"
+  sed -i "s/DOMINIO_FLIGHTS/$DOMINIO_FLIGHTS/g; s/DOMINIO_ALIAS/$DOMINIO_ALIAS/g; s/DOMINIO_FINANCE/$DOMINIO_FINANCE/g" "$destino"
+  if [ ! -f /proc/net/if_inet6 ]; then
+    log "host sem IPv6 — removendo os listen [::] da configuração"
+    sed -i '/listen \[::\]/d' "$destino"
+  fi
+}
 
-sed -i "s/DOMINIO_FLIGHTS/$DOMINIO_FLIGHTS/g; s/DOMINIO_ALIAS/$DOMINIO_ALIAS/g; s/DOMINIO_FINANCE/$DOMINIO_FINANCE/g" "$CONF"
-
-# Sem pilha IPv6 no host, `listen [::]:80` impede o nginx de subir. O VPS da
-# Hostinger tem IPv6, mas containers e algumas VMs não — então checamos.
-if [ ! -f /proc/net/if_inet6 ]; then
-  log "host sem IPv6 — removendo os listen [::] da configuração"
-  sed -i '/listen \[::\]/d' "$CONF"
+if [ -f "$CONF" ] && grep -Eq 'managed by Certbot|listen[[:space:]]+(\[::\]:)?443' "$CONF"; then
+  # Já tem HTTPS do certbot: sobrescrever apagaria os certificados e o
+  # redirecionamento 80→443 — e, como o cookie de sessão é Secure, o login
+  # pararia de funcionar até rodar o certbot de novo. Gera o modelo novo ao
+  # lado e deixa a mesclagem para quem opera.
+  montar_conf_nginx "$CONF.novo"
+  log "$CONF tem HTTPS do certbot — preservado. Modelo novo em $CONF.novo"
+  if ! diff -q "$CONF" "$CONF.novo" >/dev/null 2>&1; then
+    echo "  Diferenças (atual → novo):"
+    diff -u "$CONF" "$CONF.novo" | sed 's/^/    /' | head -80 || true
+    echo "  Mescle o que falta (ex.: remover auth_basic; location /api/py/ no host de voos),"
+    echo "  depois:  nginx -t && systemctl reload nginx"
+  fi
+  NGINX_PRESERVADO=1
+else
+  montar_conf_nginx "$CONF"
 fi
 
 ln -sfn "$CONF" /etc/nginx/sites-enabled/celestia
@@ -179,26 +277,41 @@ systemctl is-active --quiet celestia-finance-site && echo "  ✓ site Next.js at
 systemctl is-active --quiet nginx && echo "  ✓ nginx ativo" || echo "  ✗ nginx parado"
 
 echo ""
-echo "  Token da API (guarde):"
+echo "  Token da API para acesso de máquina (guarde):"
 grep CELESTIA_API_TOKEN "$CONFIG/finance.env"
 echo ""
 IP_VPS="$(curl -s -m 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')"
 echo "  Endereços configurados:"
 echo "   • Voos:     http://$DOMINIO_FLIGHTS  (e www)"
 echo "   • Alias:    http://$DOMINIO_ALIAS → redireciona para o .com"
-echo "   • Finanças: http://$DOMINIO_FINANCE  (protegido por senha)"
+echo "   • Finanças: http://$DOMINIO_FINANCE  (protegido pelo login do app)"
 echo ""
-echo "  Acesso ao app financeiro:"
-cat "$CONFIG/senha-financas.txt" | sed 's/^/   /'
+echo "  Login e contas:"
+echo "   • Entre em https://$DOMINIO_FINANCE/entrar com seu e-mail. A PRIMEIRA conta"
+echo "     que entrar vira administradora; as seguintes aguardam aprovação em /admin."
+echo "   • Sem SMTP configurado o código de acesso NÃO é enviado por e-mail — ele"
+echo "     aparece no log do motor:  journalctl -u celestia-finance-motor -f"
+echo "     Para enviar de verdade, preencha CELESTIA_SMTP_* em $CONFIG/finance.env"
+echo "     e rode: systemctl restart celestia-finance-motor"
+echo "   • Entrar com Google (opcional): GOOGLE_CLIENT_ID/SECRET no finance.env e,"
+echo "     no console do Google, a URI de retorno EXATA:"
+echo "       https://$DOMINIO_FINANCE/api/py/auth/google/retorno"
+COOKIE_DOMINIO="$(dominio_cookie "$DOMINIO_FINANCE" "$DOMINIO_FLIGHTS")"
+if [ -n "$COOKIE_DOMINIO" ]; then
+  echo "   • A mesma sessão vale em $DOMINIO_FLIGHTS (cookie em $COOKIE_DOMINIO)."
+else
+  echo "   • $DOMINIO_FINANCE não é subdomínio de $DOMINIO_FLIGHTS: cada site tem o seu login"
+  echo "     (sem SSO). Para compartilhar a sessão, use algo como financas.$DOMINIO_FLIGHTS."
+fi
 echo ""
 echo "  Próximos passos:"
 echo "   1. DNS — aponte no painel do registrador, tipo A, para $IP_VPS:"
 echo "        $DOMINIO_FLIGHTS · www · $DOMINIO_ALIAS · www · $DOMINIO_FINANCE"
 echo "      Confira com:  dig +short $DOMINIO_FLIGHTS"
-echo "   2. HTTPS (só depois do DNS propagar):"
+echo "   2. HTTPS (obrigatório: o cookie de sessão só viaja em HTTPS; só depois do DNS propagar):"
 echo "      apt install -y certbot python3-certbot-nginx"
 echo "      certbot --nginx -d $DOMINIO_FLIGHTS -d www.$DOMINIO_FLIGHTS \\"
 echo "              -d $DOMINIO_ALIAS -d www.$DOMINIO_ALIAS -d $DOMINIO_FINANCE"
-echo "   2. Firewall:  ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw enable"
-echo "   3. Atualizações futuras:  sudo bash $BASE/finance/deploy/atualizar.sh"
+echo "   3. Firewall:  ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw enable"
+echo "   4. Atualizações futuras:  sudo bash $BASE/finance/deploy/atualizar.sh"
 echo ""

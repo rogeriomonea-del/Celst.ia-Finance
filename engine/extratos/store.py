@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import threading
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -294,6 +295,13 @@ def migrar(db: sqlite3.Connection) -> int:
     return atual
 
 
+#: Serializa a criação/migração de schema. Logo depois do primeiro login a
+#: tela de extratos dispara várias requisições ao mesmo tempo e todas
+#: encontram o ``extratos.db`` da conta ainda inexistente — sem o lock, duas
+#: threads tentariam criar as mesmas tabelas e uma delas falharia com 500.
+_TRAVA_MIGRACAO = threading.Lock()
+
+
 @contextmanager
 def conexao(caminho: Optional[Path] = None) -> Iterator[sqlite3.Connection]:
     """Conexão pronta (configurada + migrada). Feche sempre via contexto.
@@ -304,7 +312,9 @@ def conexao(caminho: Optional[Path] = None) -> Iterator[sqlite3.Connection]:
     db = sqlite3.connect(str(caminho or caminho_banco()))
     try:
         _configura(db)
-        migrar(db)
+        if db.execute("PRAGMA user_version").fetchone()[0] < max(_MIGRACOES):
+            with _TRAVA_MIGRACAO:
+                migrar(db)
         yield db
     finally:
         db.close()

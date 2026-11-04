@@ -131,6 +131,36 @@ npm run typecheck
 Sem token/rede, a plataforma degrada com segurança para a base fundamentalista
 local (`lib/agents/market-data.ts`) — todos os módulos permanecem funcionais.
 
+Para rodar o site **e** o motor Python juntos (necessário para extratos e
+login), use `./scripts/dev.sh`.
+
+## Login e contas
+
+O app é multiusuário e protegido por login do próprio app — não há mais senha
+HTTP no nginx. O motor Python (`engine/auth/`) cuida de tudo em
+`/api/py/auth/*`:
+
+- **Código por e-mail**: informe o e-mail em `/entrar`, receba um código de 6
+  dígitos (vale 10 min) e pronto. Sem SMTP configurado o código **não** é
+  enviado: ele aparece no log do motor (no `./scripts/dev.sh`, no próprio
+  terminal; em produção, `journalctl -u celestia-finance-motor -f`).
+- **Entrar com Google** (opcional): com `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`
+  definidos, o botão aparece sozinho.
+- **Aprovação de contas**: o primeiro e-mail que entra vira administrador e já
+  fica ativo; os seguintes nascem "aguardando aprovação" até um admin aprovar
+  em `/admin` (contas, sessões ativas e acessos recentes). `CELESTIA_CADASTRO_ABERTO=1`
+  dispensa a aprovação.
+- **Uma sessão, dois sites**: o cookie `celestia_sessao` (HttpOnly, 30 dias)
+  sai com `Domain=CELESTIA_COOKIE_DOMINIO` (`.celestiaflights.com` em
+  produção), então o login vale também na plataforma de voos.
+- Cada conta tem seu próprio espaço de dados (`usuarios/<id>/` dentro de
+  `CELESTIA_DATA_DIR`). Para acesso de máquina continua valendo
+  `CELESTIA_API_TOKEN` (Bearer).
+
+As variáveis (SMTP, Google, domínio do cookie) estão comentadas em
+[`.env.example`](.env.example); a configuração em produção está em
+[`docs/deploy-hostinger.md`](docs/deploy-hostinger.md#login-e-contas).
+
 ## Deploy (Vercel)
 
 O `vercel.json` já pina o preset **Next.js** e o output `.next`. Basta conectar

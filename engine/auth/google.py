@@ -19,6 +19,7 @@ criptografia caseira. É o caminho recomendado para clientes confidenciais.
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import sqlite3
@@ -29,7 +30,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from .contas import ErroAuth
-from .store import agora, iso, novo_token
+from .store import agora, hash_token, iso, novo_token
 
 AUTORIZACAO = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN = "https://oauth2.googleapis.com/token"
@@ -60,7 +61,9 @@ def url_retorno() -> str:
     return f"{url_base()}{CAMINHO_RETORNO}"
 
 
-def iniciar(db: sqlite3.Connection, redirecionar_para: str = "/") -> str:
+def iniciar(
+    db: sqlite3.Connection, redirecionar_para: str = "/", *, nonce_hash: Optional[str] = None
+) -> str:
     """Guarda o ``state`` e devolve a URL para onde mandar o navegador.
 
     O ``state`` é a defesa contra CSRF no retorno: quem não passou por aqui não
@@ -72,8 +75,8 @@ def iniciar(db: sqlite3.Connection, redirecionar_para: str = "/") -> str:
     estado = novo_token(24)
     with db:
         db.execute(
-            "INSERT INTO estados_oauth (estado, redirecionar_para) VALUES (?,?)",
-            (estado, redirecionar_para or "/"),
+            "INSERT INTO estados_oauth (estado, redirecionar_para, nonce_hash) VALUES (?,?,?)",
+            (estado, redirecionar_para or "/", nonce_hash),
         )
 
     parametros = {
@@ -89,15 +92,30 @@ def iniciar(db: sqlite3.Connection, redirecionar_para: str = "/") -> str:
     return f"{AUTORIZACAO}?{urllib.parse.urlencode(parametros)}"
 
 
-def _consumir_estado(db: sqlite3.Connection, estado: str) -> str:
-    """Valida e queima o ``state``; devolve para onde redirecionar depois."""
+def _consumir_estado(
+    db: sqlite3.Connection, estado: str, *, nonce: Optional[str] = None
+) -> str:
+    """Valida e queima o ``state``; devolve para onde redirecionar depois.
+
+    Se o ``state`` foi criado com ``nonce_hash`` (cookie ``celestia_oauth``),
+    o retorno só vale com o nonce correspondente — isto é, no navegador que
+    iniciou o login. O ``state`` é apagado de qualquer jeito: uma URL de
+    retorno roubada não serve nem na segunda tentativa.
+    """
     linha = db.execute(
-        "SELECT redirecionar_para FROM estados_oauth WHERE estado = ?", (estado or "",)
+        "SELECT redirecionar_para, nonce_hash FROM estados_oauth WHERE estado = ?",
+        (estado or "",),
     ).fetchone()
     if linha is None:
         raise ErroAuth("Sessão de login expirada ou inválida. Tente novamente.")
     with db:
         db.execute("DELETE FROM estados_oauth WHERE estado = ?", (estado,))
+    esperado = linha["nonce_hash"]
+    if esperado:
+        if not nonce or not hmac.compare_digest(esperado, hash_token(nonce)):
+            raise ErroAuth(
+                "Este login foi iniciado em outro navegador. Tente novamente.", status=401
+            )
     return linha["redirecionar_para"] or "/"
 
 
@@ -116,11 +134,13 @@ def _get_json(url: str, token: str, timeout: float = 15.0) -> dict:
         return json.loads(resposta.read().decode("utf-8"))
 
 
-def concluir(db: sqlite3.Connection, code: str, estado: str) -> tuple[PerfilGoogle, str]:
+def concluir(
+    db: sqlite3.Connection, code: str, estado: str, *, nonce: Optional[str] = None
+) -> tuple[PerfilGoogle, str]:
     """Troca o ``code`` pelo perfil. Devolve ``(perfil, redirecionar_para)``."""
     if not configurado():
         raise ErroAuth("Entrar com Google não está configurado neste servidor.", status=501)
-    destino = _consumir_estado(db, estado)
+    destino = _consumir_estado(db, estado, nonce=nonce)
     if not code:
         raise ErroAuth("O Google não devolveu o código de autorização.")
 
